@@ -23,9 +23,9 @@
 --[=[
 	@function Get
 	@within Get
-	@param initalObject Instance The object to start navigating from.
-	@param ... string | {string} The names of the children to navigate through.
-	@return ...Instance A tuple of all the requested children at the final location.
+	@param initialObject Instance -- The object to start navigating from.
+	@param ... string | {string} -- The names of the children to navigate through.
+	@return ...Instance -- A tuple of all the requested children at the final location.
 ]=]
 return function(initialObject: Instance, ...): ...Instance
 	local object = initialObject

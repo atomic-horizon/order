@@ -8,9 +8,6 @@ local GetRemote = shared("GetRemote") ---@module GetRemote
 local Icon = shared("TopbarPlus") ---@module TopbarPlus
 local PermissionService = shared("PermissionService") ---@module PermissionService
 
---[=[
-	@class Branches
-]=]
 local Branches = {}
 
 local TOGGLE_KEY_BIND = Enum.KeyCode.F3

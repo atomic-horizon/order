@@ -16,6 +16,12 @@ local RunService = game:GetService("RunService")
 
 -- Task Declaration
 
+--[=[
+	@class PlayerData
+
+	Provides an interface for managing player data using ProfileService and
+	ReplicaService.
+]=]
 local PlayerData = {}
 
 -- Dependencies

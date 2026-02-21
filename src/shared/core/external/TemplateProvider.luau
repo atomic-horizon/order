@@ -1,7 +1,3 @@
---[=[
-	@class TemplateProvider
-]=]
-
 local RunService = game:GetService("RunService")
 
 local BaseObject = shared("BaseObject")
