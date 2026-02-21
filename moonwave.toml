@@ -4,7 +4,7 @@ changelog = true
 
 [docusaurus]
 onBrokenLinks = "warn"
-baseUrl = "/"
+baseUrl = "/order/"
 
 [footer]
 copyright = " "

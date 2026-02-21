@@ -6,6 +6,7 @@
 /*.rbxl.lock
 
 Packages/
+build/
 
 *.DS_Store
 
