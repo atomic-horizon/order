@@ -1,0 +1,10 @@
+title = "Order"
+
+changelog = true
+
+[docusaurus]
+onBrokenLinks = "warn"
+baseUrl = "/order/"
+
+[footer]
+copyright = " "
