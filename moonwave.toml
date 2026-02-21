@@ -1,0 +1,10 @@
+title = "The Order Framework"
+
+changelog = true
+
+[docusaurus]
+onBrokenLinks = "warn"
+baseUrl = "/"
+
+[footer]
+copyright = " "

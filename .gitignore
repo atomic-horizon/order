@@ -4,3 +4,11 @@
 # Roblox Studio lock files
 /*.rbxlx.lock
 /*.rbxl.lock
+
+Packages/
+
+*.DS_Store
+
+wally.lock
+
+mcp.json

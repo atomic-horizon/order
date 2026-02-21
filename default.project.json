@@ -1,0 +1,58 @@
+{
+	"name": "New Order Project",
+	"emitLegacyScripts": false,
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"$className": "ReplicatedStorage",
+			"$ignoreUnknownInstances": true,
+			"Order": {
+				"$path": "src/framework"
+			},
+			"Shared": {
+				"$path": "src/shared",
+				"AssetModules": {
+					"$path": "assets"
+				}
+			},
+			"Packages": {
+				"$path": "Packages"
+			},
+			"Assets": {
+				"$className": "Folder",
+				"$ignoreUnknownInstances": true
+			},
+			"GuiTemplates": {
+				"$className": "Folder",
+				"$ignoreUnknownInstances": true
+			}
+		},
+		"ReplicatedFirst": {
+			"$className": "ReplicatedFirst",
+			"$ignoreUnknownInstances": true,
+			"$path": "src/first"
+		},
+		"ServerScriptService": {
+			"$className": "ServerScriptService",
+			"Server": {
+				"$path": "src/server"
+			}
+		},
+		"StarterPlayer": {
+			"$className": "StarterPlayer",
+			"$ignoreUnknownInstances": true,
+			"StarterPlayerScripts": {
+				"$className": "StarterPlayerScripts",
+				"$ignoreUnknownInstances": true,
+				"Client": {
+					"$path": "src/client"
+				}
+			},
+			"StarterCharacterScripts": {
+				"$className": "StarterCharacterScripts",
+				"$ignoreUnknownInstances": true,
+				"$path": "src/character"
+			}
+		}
+	}
+}

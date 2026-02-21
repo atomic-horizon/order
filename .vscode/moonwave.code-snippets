@@ -1,0 +1,312 @@
+{
+	"Moonwave Comment": {
+		"prefix": [
+			"moonwavecomment",
+			"doccomment"
+		],
+		"body": [
+			"--[=[",
+			"\t$0",
+			"]=]"
+		],
+		"description": "Moonwave documentation comment."
+	},
+	"Moonwave Class": {
+		"prefix": [
+			"moonwaveclass",
+			"docclass"
+		],
+		"body": [
+			"--[=[",
+			"\t@class $TM_FILENAME_BASE",
+			"\t",
+			"\t$0",
+			"]=]"
+		],
+		"description": "Moonwave's default class signature to add at the top of your files."
+	},
+	"Moonwave Within": {
+		"prefix": [
+			"moonwavewithin",
+			"docwithin"
+		],
+		"body": [
+			"@within $TM_FILENAME_BASE"
+		],
+		"description": "Moonwave documentation within tag."
+	},
+	"Moonwave Type": {
+		"prefix": [
+			"moonwavetype",
+			"doctype"
+		],
+		"body": [
+			"@type ${1:name} ${2:type}",
+			"@within $TM_FILENAME_BASE",
+			"$0"
+		],
+		"description": "Moonwave documentation type tag."
+	},
+	"Moonwave Interface": {
+		"prefix": [
+			"moonwaveinterface",
+			"docinterface"
+		],
+		"body": [
+			"--[=[",
+			"\t@interface ${1:interface_name}",
+			"\t@within $TM_FILENAME_BASE",
+			"\t",
+			"\t$0",
+			"]=]"
+		],
+		"description": "Moonwave documentation type tag."
+	},
+	"Moonwave Interface Field": {
+		"prefix": [
+			"moonwavefield",
+			"docfield"
+		],
+		"body": [
+			".${1:field_name} ${2:type} -- ${3:description} $0",
+		],
+		"description": "Moonwave documentation type tag."
+	},
+	"Moonwave Tag": {
+		"prefix": [
+			"moonwavetag",
+			"doctag"
+		],
+		"body": [
+			"@tag ${1:tag_name} $0",
+		],
+		"description": "Moonwave documentation tag tag."
+	},
+	"Moonwave Function Param": {
+		"prefix": [
+			"moonwaveparam",
+			"docparam"
+		],
+		"body": [
+			"@param ${1:name} ${2:type} -- ${3:comment} $0"
+		],
+		"description": "Moonwave documentation param tag."
+	},
+	"Moonwave Function Return": {
+		"prefix": [
+			"moonwavereturn",
+			"docreturn"
+		],
+		"body": [
+			"@return ${1:type} -- ${2:comment} $0"
+		],
+		"description": "Moonwave documentation return tag."
+	},
+	"Moonwave Function Yields": {
+		"prefix": [
+			"moonwaveyields",
+			"docyields"
+		],
+		"body": [
+			"@yields",
+		],
+		"description": "Moonwave documentation yield tag."
+	},
+	"Moonwave Function Error": {
+		"prefix": [
+			"moonwaveerror",
+			"docerror"
+		],
+		"body": [
+			"@error ${1:type} -- ${2:description} $0",
+		],
+		"description": "Moonwave documentation error tag."
+	},
+	"Moonwave Usage Unreleased": {
+		"prefix": [
+			"moonwaveunreleased",
+			"docunreleased"
+		],
+		"body": [
+			"@unreleased",
+		],
+		"description": "Moonwave documentation unreleased tag."
+	},
+	"Moonwave Usage Since": {
+		"prefix": [
+			"moonwavesince",
+			"docsince"
+		],
+		"body": [
+			"@since ${1:version} $0",
+		],
+		"description": "Moonwave documentation since tag."
+	},
+	"Moonwave Usage Deprecated": {
+		"prefix": [
+			"moonwavedeprecated",
+			"docdeprecated"
+		],
+		"body": [
+			"@deprecated ${1:version} -- ${2:description} $0",
+		],
+		"description": "Moonwave documentation deprecated tag."
+	},
+	"Moonwave Realm Server": {
+		"prefix": [
+			"moonwaveserver",
+			"docserver"
+		],
+		"body": [
+			"@server",
+		],
+		"description": "Moonwave documentation server realm tag."
+	},
+	"Moonwave Realm Client": {
+		"prefix": [
+			"moonwaveclient",
+			"docclient"
+		],
+		"body": [
+			"@client",
+		],
+		"description": "Moonwave documentation client realm tag."
+	},
+	"Moonwave Realm Plugin": {
+		"prefix": [
+			"moonwaveplugin",
+			"docplugin"
+		],
+		"body": [
+			"@plugin",
+		],
+		"description": "Moonwave documentation plugin realm tag."
+	},
+	"Moonwave Realm All": {
+		"prefix": [
+			"moonwaveallrealms",
+			"docallrealms"
+		],
+		"body": [
+			"@server",
+			"@client",
+			"@plugin",
+		],
+		"description": "Moonwave documentation all realm tags."
+	},
+	"Moonwave Visibility Private": {
+		"prefix": [
+			"moonwaveprivate",
+			"docprivate"
+		],
+		"body": [
+			"@private",
+		],
+		"description": "Moonwave documentation private visibility tag."
+	},
+	"Moonwave Visibility Ignore": {
+		"prefix": [
+			"moonwaveignore",
+			"docignore"
+		],
+		"body": [
+			"@ignore",
+		],
+		"description": "Moonwave documentation ignore visibility tag."
+	},
+	"Moonwave Prop": {
+		"prefix": [
+			"moonwaveprop",
+			"docprop"
+		],
+		"body": [
+			"--[=[",
+			"\t@prop ${1:name} ${2:type}",
+			"\t@within $TM_FILENAME_BASE",
+			"\t",
+			"\t$0",
+			"]=]"
+		],
+		"description": "Moonwave documentation prop tag."
+	},
+	"Moonwave Prop Readonly": {
+		"prefix": [
+			"moonwavereadonly",
+			"docreadonly"
+		],
+		"body": [
+			"@readonly",
+		],
+		"description": "Moonwave documentation readonly prop tag."
+	},
+	"Moonwave Index": {
+		"prefix": [
+			"moonwaveindex",
+			"docindex"
+		],
+		"body": [
+			"@__index ${1:name} $0",
+		],
+		"description": "Moonwave documentation __index class tag."
+	},
+	"Moonwave Admonition Note": {
+		"prefix": [
+			"admonoitionnote",
+			"docnote"
+		],
+		"body": [
+			":::note",
+			"$0",
+			":::",
+		],
+		"description": "Moonwave/Docusaurus documentation note admonition."
+	},
+	"Moonwave Admonition Tip": {
+		"prefix": [
+			"admonoitiontip",
+			"doctip"
+		],
+		"body": [
+			":::tip",
+			"$0",
+			":::",
+		],
+		"description": "Moonwave/Docusaurus documentation tip admonition."
+	},
+	"Moonwave Admonition Info": {
+		"prefix": [
+			"admonoitioninfo",
+			"docinfo"
+		],
+		"body": [
+			":::info",
+			"$0",
+			":::",
+		],
+		"description": "Moonwave/Docusaurus documentation info admonition."
+	},
+	"Moonwave Admonition Warning": {
+		"prefix": [
+			"admonoitionwarning",
+			"docwarning"
+		],
+		"body": [
+			":::warning",
+			"$0",
+			":::",
+		],
+		"description": "Moonwave/Docusaurus documentation warning admonition."
+	},
+	"Moonwave Admonition Danger": {
+		"prefix": [
+			"admonitiondanger",
+			"docdanger"
+		],
+		"body": [
+			":::danger",
+			"$0",
+			":::",
+		],
+		"description": "Moonwave/Docusaurus documentation danger admonition."
+	}
+}
