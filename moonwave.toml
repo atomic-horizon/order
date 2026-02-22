@@ -4,7 +4,19 @@ changelog = true
 
 [docusaurus]
 onBrokenLinks = "warn"
+url = "https://atomic-horizon.github.io"
 baseUrl = "/order/"
+favicon = "/img/favicon.ico"
+
+[home]
+enabled = true
+includeReadme = false
 
 [footer]
-copyright = " "
+copyright = "Copyright © 2026 Atomic Horizon LLC"
+
+[navbar.logo]
+alt = 'Logo'
+src = '/img/icon.svg'
+href = '/'
+target = '_self'
