@@ -8,13 +8,15 @@ title: Usage
 ## Settings
 The framework settings module (located at `src/framework/Settings.luau`) has a few different options that developers can customize for their projects.
 
-- `Debug.CyclicAnalysis` - When set to `true` this will track the different cyclic dependencies that exist within the project and will print out an analysis following project initialization.
-- `Debug.VerboseLoading` - When set to `true` this will print out information as the initialization process executes, such as which modules have been discovered, what the initialization order is, and when each module finishes initializing.
-- `SilentMode` - When set to `true` this will disable all regular output (version printing, notifications about when initialization has finished, etc.) This will not disable warnings. By default this is turned off during Studio development, and turned on for production.
-- `InitOrder` - Can be set to either `"Project"` or `"Individual"`. Project means that each initialization function will be run on every task before moving on to the next initialization function. Individual means that each task will run through each of its initialization functions before moving on to the next task. Both settings respect module priority values.
-- `InitFunctionConfig` - A table that defines the initialization functions for the project and their options.
-- `PlaceTypes` - A table that defines the different types for each place within the game universe. If a place type is not specified for the current place ID, it will default to "Generic". The place type is accessible in project code via `shared.PlaceType` for more custom place-specific behavior.
-- `CodeGroups` - A table that defines the different code groups for the project and their corresponding root directory names. Each code group's name should correspond directly to a defined place type. This allows you to selectively share code between different server types (ex. having a single player data module for the lobby, the game server, etc.)
+| Setting | Description |
+| --- | --- |
+| `Debug.CyclicAnalysis` | When `true`, tracks cyclic dependency chains across the project and prints an analysis after initialization completes. |
+| `Debug.VerboseLoading` | When `true`, prints detailed information during initialization: discovered modules, the resolved load order, and when each module finishes. |
+| `SilentMode` | When `true`, suppresses all regular output (version info, initialization notices, etc.). Warnings are never suppressed. Defaults to `false` in Studio and `true` in production. |
+| `InitOrder` | `"Project"` runs each initializer across all tasks before moving to the next. `"Individual"` runs all initializers on each task before moving to the next task. Both modes respect priority values. |
+| `InitFunctionConfig` | A table defining the initialization functions for the project and their options (name, async, protected, warn delay). |
+| `PlaceTypes` | Maps Place IDs to named place type strings. Unrecognized places default to `"Generic"`. The active type is accessible at runtime via `shared.PlaceType`. |
+| `CodeGroups` | Maps place type names to the set of code group root directories that should be active for that type. Enables selectively sharing modules across different server types (e.g. lobby vs. game server). |
 
 ## File structure
 

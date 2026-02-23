@@ -13,7 +13,49 @@ enabled = true
 includeReadme = false
 
 [footer]
+style = "dark"
 copyright = "Copyright © 2026 Atomic Horizon LLC"
+
+[[footer.links]]
+title = "Docs"
+
+  [[footer.links.items]]
+  label = "Introduction"
+  to = "/docs/intro"
+
+  [[footer.links.items]]
+  label = "Getting Started"
+  to = "/docs/gettingstarted"
+
+  [[footer.links.items]]
+  label = "Usage"
+  to = "/docs/setup"
+
+  [[footer.links.items]]
+  label = "Special Notes"
+  to = "/docs/notes"
+
+[[footer.links]]
+title = "API"
+
+  [[footer.links.items]]
+  label = "API Reference"
+  to = "/api"
+
+  [[footer.links.items]]
+  label = "AtomicUI"
+  to = "/docs/atomicui"
+
+[[footer.links]]
+title = "More"
+
+  [[footer.links.items]]
+  label = "GitHub"
+  href = "https://github.com/atomic-horizon/order"
+
+  [[footer.links.items]]
+  label = "Roblox Marketplace"
+  href = "https://www.roblox.com/library/11152308855/"
 
 [navbar.logo]
 alt = 'Logo'

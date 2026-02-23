@@ -1,0 +1,261 @@
+/* ── Brand color override ────────────────────────────────────────────────── */
+/* Matches the logo gradient: #ff3434 → #ff5a37                               */
+
+:global(:root) {
+	--ifm-color-primary: #ff5c4d;
+	--ifm-color-primary-dark: #e04035;
+	--ifm-color-primary-darker: #d03a2f;
+	--ifm-color-primary-darkest: #a82520;
+	--ifm-color-primary-light: #ff7a62;
+	--ifm-color-primary-lighter: #ff8d78;
+	--ifm-color-primary-lightest: #ffb3a0;
+}
+
+/* ── Hero ─────────────────────────────────────────────────────────────────── */
+
+.heroBanner {
+	padding: 5rem 0 4rem;
+	text-align: center;
+	position: relative;
+	overflow: hidden;
+	background: linear-gradient(135deg, #7a1e18 0%, #c43020 45%, #e85f22 100%);
+}
+
+.heroBanner::before {
+	content: "";
+	position: absolute;
+	inset: 0;
+	background-image: radial-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+	background-size: 32px 32px;
+	pointer-events: none;
+}
+
+.titleOnBannerImage,
+.heroBanner :global(.hero__title) {
+	color: #ffffff;
+	text-shadow: 0 2px 12px rgba(0, 0, 0, 0.5);
+	font-size: 3.5rem;
+	font-weight: 800;
+	letter-spacing: -0.5px;
+}
+
+.taglineOnBannerImage,
+.heroBanner :global(.hero__subtitle) {
+	color: rgba(255, 255, 255, 0.85);
+	font-size: 1.4rem;
+	margin-bottom: 0.5rem;
+}
+
+.heroDescription {
+	color: rgba(255, 255, 255, 0.65);
+	font-size: 1rem;
+	max-width: 600px;
+	margin: 0 auto 2rem;
+	line-height: 1.7;
+}
+
+.buttons {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 1rem;
+	flex-wrap: wrap;
+	margin-bottom: 2rem;
+}
+
+.heroMeta {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 0.5rem;
+	flex-wrap: wrap;
+}
+
+.heroBadge {
+	display: inline-block;
+	padding: 0.2rem 0.75rem;
+	background: rgba(255, 255, 255, 0.12);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 999px;
+	color: rgba(255, 255, 255, 0.8);
+	font-size: 0.775rem;
+	font-weight: 600;
+	letter-spacing: 0.03em;
+	text-decoration: none;
+}
+
+.heroBadgeLink {
+	transition: background 0.2s, border-color 0.2s;
+}
+
+.heroBadgeLink:hover {
+	background: rgba(255, 255, 255, 0.2);
+	border-color: rgba(255, 255, 255, 0.4);
+	color: #fff;
+	text-decoration: none;
+}
+
+/* ── Shared section styles ───────────────────────────────────────────────── */
+
+.sectionHeading {
+	text-align: center;
+	font-size: 2rem;
+	font-weight: 700;
+	margin-bottom: 0.5rem;
+}
+
+.sectionSubheading {
+	text-align: center;
+	color: var(--ifm-color-secondary-darkest);
+	font-size: 1.05rem;
+	max-width: 600px;
+	margin: 0 auto 3rem;
+	line-height: 1.7;
+}
+
+/* ── Features ────────────────────────────────────────────────────────────── */
+
+.features {
+	padding: 5rem 0;
+	background: var(--ifm-background-surface-color);
+}
+
+.features :global(.row) {
+	row-gap: 1.5rem;
+}
+
+.featureCard {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	height: 100%;
+	padding: 1.75rem;
+	background: var(--ifm-card-background-color);
+	border: 1px solid var(--ifm-toc-border-color);
+	border-radius: 12px;
+	transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.featureCard:hover {
+	transform: translateY(-3px);
+	box-shadow: 0 8px 24px rgba(0, 0, 0, 0.1);
+}
+
+.featureIcon {
+	color: var(--ifm-color-primary);
+	margin-bottom: 1rem;
+	line-height: 0;
+}
+
+.featureBody h3 {
+	font-size: 1.1rem;
+	font-weight: 700;
+	margin-bottom: 0.5rem;
+}
+
+.featureBody p {
+	font-size: 0.95rem;
+	color: var(--ifm-font-color-secondary);
+	margin: 0;
+	line-height: 1.7;
+}
+
+/* ── Code Showcase ────────────────────────────────────────────────────────── */
+
+.codeShowcase {
+	padding: 5rem 0;
+}
+
+.codePanel {
+	max-width: 820px;
+	margin: 0 auto;
+	border: 1px solid var(--ifm-toc-border-color);
+	border-radius: 12px;
+	overflow: hidden;
+	box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+}
+
+.codeTabs {
+	display: flex;
+	background: var(--ifm-background-surface-color);
+	border-bottom: 1px solid var(--ifm-toc-border-color);
+	padding: 0 0.5rem;
+}
+
+.codeTab {
+	padding: 0.75rem 1.25rem;
+	font-size: 0.875rem;
+	font-weight: 600;
+	background: none;
+	border: none;
+	border-bottom: 2px solid transparent;
+	cursor: pointer;
+	color: var(--ifm-font-color-secondary);
+	transition: color 0.15s, border-color 0.15s;
+	margin-bottom: -1px;
+}
+
+.codeTab:hover {
+	color: var(--ifm-color-primary);
+}
+
+.codeTabActive {
+	color: var(--ifm-color-primary);
+	border-bottom-color: var(--ifm-color-primary);
+}
+
+.codeBlockWrapper {
+	margin: 0;
+}
+
+.codeBlockWrapper :global(.theme-code-block) {
+	margin: 0 !important;
+	border-radius: 0 !important;
+	box-shadow: none !important;
+}
+
+.codeBlockWrapper :global(.theme-code-block pre),
+.codeBlockWrapper :global(.theme-code-block code) {
+	border-radius: 0 !important;
+	font-size: 0.875rem !important;
+	line-height: 1.7 !important;
+}
+
+/* ── Footer (global) ──────────────────────────────────────────────────────── */
+
+:global(.footer) {
+	padding-top: 0;
+	background: #0f0f0f;
+	border-top: 3px solid transparent;
+	border-image: linear-gradient(90deg, #c43020, #e85f22) 1;
+}
+
+:global(.footer__links) {
+	padding: 2.5rem 0 1rem;
+}
+
+:global(.footer__title) {
+	color: rgba(255, 255, 255, 0.95);
+	font-size: 0.75rem;
+	text-transform: uppercase;
+	letter-spacing: 0.1em;
+	margin-bottom: 0.75rem;
+}
+
+:global(.footer__link-item) {
+	color: rgba(255, 255, 255, 0.5);
+	transition: color 0.15s;
+}
+
+:global(.footer__link-item:hover) {
+	color: var(--ifm-color-primary-lightest);
+	text-decoration: none;
+}
+
+:global(.footer__copyright) {
+	border-top: 1px solid rgba(255, 255, 255, 0.08);
+	padding-top: 1.25rem;
+	margin-top: 0.5rem;
+	color: rgba(255, 255, 255, 0.3);
+	font-size: 0.8rem;
+}
