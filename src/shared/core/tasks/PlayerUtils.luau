@@ -4,44 +4,13 @@
 	Module: PlayerUtils.lua
 	Version: 2.0.0
 
+]]
+
+--[=[
+	@class PlayerUtils
+
 	Provides utility functions for working with players.
-
-]]
-
---[[ API
-
-	::OnPlayerAdded(callback: function, callbackName: string): function
-		Add a callback for any player, existing and future, that joins.
-		Example:
-		```lua
-			PlayerUtils:OnPlayerAdded(function(player, playerMaid)
-				print(`Hello, {player.Name}!`)
-			end, "CallbackName")
-		```
-
-	::RemoveJoinCallback(callbackName: string)
-		Remove a spawn callback by name.
-		Example:
-		```lua
-			PlayerUtils:RemoveJoinCallback("Callback")
-		```
-
-	::GetPlayerMaid(player: Player): Maid
-        Returns the maid associated with a specific player, which cleans up
-		when the player disconnects.
-		Example:
-		```lua
-			local character = PlayerUtils:GetPlayerMaid(player, true)
-		```
-
-	::FetchUserInfo(userId: number): table?
-        Fetch the user info for the user with the specified UserId from the
-		Roblox website.
-		Example:
-		```lua
-			local character = PlayerUtils:GetUserInfo(player, true)
-		```
-]]
+]=]
 
 -- Services
 
@@ -56,6 +25,15 @@ local rcall = shared("rcall") ---@module rcall
 -- Types
 
 type Maid = Maid.Maid
+--[=[
+	@interface UserInfo
+	@within PlayerUtils
+
+	.Id number
+	.Username string
+	.DisplayName string
+	.HasVerifiedBadge boolean
+]=]
 type UserInfo = {
 	Id: number,
 	Username: string,
@@ -75,9 +53,18 @@ local UserInfo = {} :: { [number]: UserInfo }
 
 -- Public Functions
 
--- Adds a callback for any player, existing and future, that joins.
---@param callback function (player: Player, playerMaid: Maid) -> ()
---@param callbackName string? The name of the callback to add (optional)
+--[=[
+	Add a callback for any player, existing and future, that joins.
+
+	```lua
+	PlayerUtils:OnPlayerAdded(function(player, playerMaid)
+		print(`Hello, {player.Name}!`)
+	end, "CallbackName")
+	```
+
+	@param callback function -- The callback to invoke when a player joins
+	@param callbackName string? -- The name of the callback (optional)
+]=]
 function PlayerUtils:OnPlayerAdded(callback: (player: Player, maid: Maid) -> (), callbackName: string?)
 	if not callbackName then
 		table.insert(JoinCallbacks, callback)
@@ -92,8 +79,15 @@ function PlayerUtils:OnPlayerAdded(callback: (player: Player, maid: Maid) -> (),
 	end
 end
 
--- Remove a callback for all players when they spawn, future and existing
---@param callbackName string The name of the callback to remove
+--[=[
+	Remove a spawn callback by name.
+
+	```lua
+	PlayerUtils:RemoveJoinCallback("CallbackName")
+	```
+
+	@param callbackName string -- The name of the callback to remove
+]=]
 function PlayerUtils:RemoveJoinCallback(callbackName: string)
 	if not JoinCallbacks[callbackName] then
 		return
@@ -102,9 +96,13 @@ function PlayerUtils:RemoveJoinCallback(callbackName: string)
 	JoinCallbacks[callbackName] = nil
 end
 
--- Get the maid for the player
---@param player Player The player to get the maid for
---@return table Maid The PlayerMaid for the player
+--[=[
+	Returns the maid associated with a specific player, which cleans up
+	when the player disconnects.
+
+	@param player Player -- The player to get the maid for
+	@return Maid -- The PlayerMaid for the player
+]=]
 function PlayerUtils:GetPlayerMaid(player: Player): Maid
 	assert(player, "Must provide a Player object to fetch maid")
 
@@ -115,10 +113,14 @@ function PlayerUtils:GetPlayerMaid(player: Player): Maid
 	return PlayerMaids[player]
 end
 
--- Fetch the user info for the user with the specified UserId from the Roblox
--- website
---@param userId number The UserId to get the user info from
---@return table UserInfo The users info
+--[=[
+	Fetch the user info for the user with the specified UserId from the
+	Roblox website.
+
+	@param userId number -- The UserId to get the user info from
+	@return UserInfo? -- The user's info
+	@yields
+]=]
 function PlayerUtils:FetchUserInfo(userId: number): UserInfo?
 	local cachedInfo = UserInfo[userId]
 	if cachedInfo then

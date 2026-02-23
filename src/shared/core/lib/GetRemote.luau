@@ -4,134 +4,36 @@
 	Module: GetRemote.lua
 	Version: 1.5.0
 
-	Provides a simple interface for creating and using remotes. The Remote
-	object is a wrapper that will dynamically create RemoteEvents,
-	UnreliableRemoteEvents and RemoteFunctions based on what it is used for. It
-	combines the interface of all three objects into one for ease of use. See
-	Remote API section below for details.
+]]
 
-	Example usage:
+--[=[
+	@class GetRemote
+
+	Provides a simple interface for creating and using remotes. The [Remote](/api/Remote)
+	object is a wrapper that will dynamically create `RemoteEvents`,
+	`UnreliableRemoteEvents`, and `RemoteFunctions` based on how it is used,
+	combining the interface of all three into one for ease of use.
+
 	```lua
-		local GetRemote = shared("GetRemote") ---@module GetRemote
+	local GetRemote = shared("GetRemote") ---@module GetRemote
 
-		local TestRemote = GetRemote("TestRemote")
+	local TestRemote = GetRemote("TestRemote")
 
-		TestRemote:OnEvent(function(player, ...)
-			print("TestRemote fired by " .. player.Name .. ", got:", ...)
-		end)
+	TestRemote:OnEvent(function(player, ...)
+		print("TestRemote fired by " .. player.Name .. ", got:", ...)
+	end)
 
-		TestRemote:OnInvoke(function()
-			return "Working"
-		end)
+	TestRemote:OnInvoke(function()
+		return "Working"
+	end)
 
-		TestRemote:Fire("Fired to all clients")
+	TestRemote:Fire("Fired to all clients")
 
-		local player = Players:GetPlayers()[1]
-		print("Client invoke test returned:", TestRemote:Invoke(player))
-		TestRemote:FireClient(player, "Fired to " .. player.Name)
+	local player = Players:GetPlayers()[1]
+	print("Client invoke test returned:", TestRemote:Invoke(player))
+	TestRemote:FireClient(player, "Fired to " .. player.Name)
 	```
-
-]]
-
---[[ Remote API
-	:OnEvent(self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> RBXScriptConnection
-	    Connects the provided callback to the remote's event. Context is
-	    determined automatically. If a rate limit interval is provided, then any
-	    events fired within that amount of time for this callback will be cached
-	    and processed at the next available time.
-
-	    It will only execute the callback with the latest set of arguments if
-		placed in a queue. This can be useful for preventing remote spam, but it
-		may also cause normal events to be dropped if the interval is set too
-		high.
-
-	:OnUnreliableEvent(self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> RBXScriptConnection
-		Connects the provided callback to the remote's event using an unreliable
-	    connection. Context is determined automatically. If a rate limit
-	    interval is provided, then any events fired within that amount of time
-	    for this callback will be cached and processed at the next available
-	    time.
-
-	    It will only execute the callback with the latest set of arguments if
-		placed in a queue. This can be useful for preventing remote spam, but it
-		may also cause normal events to be dropped if the interval is set too
-		high.
-
-	:OnClientEvent(self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> RBXScriptConnection
-	    Compatibility alias for :OnEvent()
-
-	:OnClientUnreliableEvent(self: Remote, callback: (...any) -> (), rateLimitInterval: number?) ->	RBXScriptConnection
-		Compatibility alias for :OnUnreliableEvent()
-
-	:OnServerEvent(self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> RBXScriptConnection
-	    Compatibility alias for :OnEvent()
-
-	:OnServerUnreliableEvent(self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> RBXScriptConnection
-		Compatibility alias for :OnUnreliableEvent()
-
-	:OnInvoke(self: Remote, callback: (player: Player, ...any) -> any) -> ()
-	    Connects the provided callback to the remote's function. Context is
-	    determined automatically.
-
-	:GetOnEventSignal(self: Remote) -> RBXScriptSignal
-	    Returns the signal that is connected to the remote's event.
-
-	:FireClient(self: Remote, player: Player, ...any) -> ()
-	    Fires the remote's event to the given player.
-
-	:FireClientUnreliable(self: Remote, player: Player, ...any) -> ()
-	    Fires the remote's event to the given player using an unreliable
-	    connection.
-
-	:FireClientList(self: Remote, players: {Player}, ...any) -> ()
-	    Fires the remote's event to the given list of players.
-
-	:FireClientListUnreliable(self: Remote, players: {Player}, ...any) -> ()
-		Fires the remote's event to the given list of players using an
-	    unreliable connection.
-
-	:FireAllClients(self: Remote, ...any) -> ()
-	    Fires the remote's event to all players.
-
-	:FireAllClientsUnreliable(self: Remote, ...any) -> ()
-		Fires the remote's event to all players using an unreliable connection.
-
-	:FireAllExcept(self: Remote, excluded: Player | {Player}, ...any) -> ()
-	    Fires the remote's event to all players except the given player or list
-	    of players.
-
-	:FireAllExceptUnreliable(self: Remote, excluded: Player | {Player}, ...any) -> ()
-		Fires the remote's event to all players except the given player or list
-	    of players using an unreliable connection.
-
-	:FireServer(self: Remote, ...any) -> ()
-	    Fires the remote's event to the server.
-
-	:FireServerUnreliable(self: Remote, ...any) -> ()
-	    Fires the remote's event to the server using an unreliable connection.
-
-	:Fire(self: Remote, ...any) -> ()
-	    Fires the remote's event to the server if called from the client, or to
-	    all clients if called from the server.
-
-	:FireUnreliable(self: Remote, ...any) -> ()
-		Fires the remote's event to the server if called from the client, or to
-	    all clients if called from the server using an unreliable connection.
-
-	:InvokeClient(self: Remote, player: Player, ...any) -> any
-	    Invokes the remote's function on the given player.
-
-	:InvokeServer(self: Remote, ...any) -> any
-	    Invokes the remote's function on the server.
-
-	:Invoke(self: Remote, ...any) -> any
-	    Invokes the remote's function on the server if called from the client,
-	    or on the client if called from the server.
-
-	:HasRequestedEvent(self: Remote) -> boolean
-	    Returns whether or not the RemoteEvent has already requested to the
-	    server to get the _event object.
-]]
+]=]
 
 -- Services
 
@@ -186,6 +88,14 @@ export type Remote = {
 }
 
 export type RemoteForceLoad = { Event: boolean, UnreliableEvent: boolean, Function: boolean }
+
+--[=[
+	@class Remote
+
+	A wrapper around `RemoteEvent`, `UnreliableRemoteEvent`, and `RemoteFunction`
+	that combines their interfaces into a single object. Instances are created
+	and retrieved via [GetRemote](/api/GetRemote).
+]=]
 
 -- Classes
 
@@ -408,14 +318,18 @@ function Remote:_connectRateLimitedCallback(
 	end)
 end
 
--- Connects the provided callback to the remote's event. Context is determined
--- automatically. If a rate limit interval is provided, then any events fired
--- within that amount of time for this callback will be cached and processed at
--- the next available time.
---
--- It will only execute the callback with the latest set of arguments if placed
--- in a queue. This can be useful for preventing remote spam, but it may also
--- cause normal events to be dropped if the interval is set too high.
+--[=[
+	Connects the provided callback to the remote's event. Context is determined
+	automatically. If a `rateLimitInterval` is provided, events fired within
+	that duration will be queued and only the latest arguments processed. This
+	can prevent remote spam, but may cause events to be dropped if set too high.
+
+	`OnServerEvent` and `OnClientEvent` are aliases for this method.
+
+	@param callback function -- The callback to invoke when the event fires
+	@param rateLimitInterval number? -- If provided, rate-limits the callback to this interval in seconds
+	@return RBXScriptConnection
+]=]
 function Remote:OnEvent(callback: (...any) -> (), rateLimitInterval: number?)
 	task.spawn(function()
 		if not RunService:IsRunning() then
@@ -433,20 +347,19 @@ end
 Remote.OnServerEvent = Remote.OnEvent
 Remote.OnClientEvent = Remote.OnEvent
 
--- Connects the provided callback to the remote's function. Context is
--- determined automatically.
-function Remote:GetOnEventSignal(): RBXScriptSignal
-	return if IS_SERVER then self:_getEventServer().OnServerEvent else self:_getEventClient().OnClientEvent
-end
+--[=[
+	Connects the provided callback to the remote's unreliable event. Context is
+	determined automatically. If a `rateLimitInterval` is provided, events fired
+	within that duration will be queued and only the latest arguments processed.
+	This can prevent remote spam, but may cause events to be dropped if set too
+	high.
 
--- Connects the provided callback to the remote's unreliable event. Context is
--- determined automatically. If a rate limit interval is provided, then any
--- events fired within that amount of time for this callback will be cached and
--- processed at the next available time.
---
--- It will only execute the callback with the latest set of arguments if placed
--- in a queue. This can be useful for preventing remote spam, but it may also
--- cause normal events to be dropped if the interval is set too high.
+	`OnServerUnreliableEvent` and `OnClientUnreliableEvent` are aliases for this method.
+
+	@param callback function -- The callback to invoke when the event fires
+	@param rateLimitInterval number? -- If provided, rate-limits the callback to this interval in seconds
+	@return RBXScriptConnection
+]=]
 function Remote:OnUnreliableEvent(callback: (...any) -> (), rateLimitInterval: number?)
 	task.spawn(function()
 		local event = if IS_SERVER
@@ -462,7 +375,13 @@ end
 Remote.OnServerUnreliableEvent = Remote.OnUnreliableEvent
 Remote.OnClientUnreliableEvent = Remote.OnUnreliableEvent
 
--- Identical to RemoteEvent:FireClient()
+--[=[
+	Fires the remote's event to the given player. Identical to `RemoteEvent:FireClient()`.
+
+	@server
+	@param player Player -- The player to fire the event to
+	@param ... any -- The arguments to pass to the client
+]=]
 function Remote:FireClient(player: Player, ...)
 	assert(IS_SERVER, "FireClient can only be called on the server")
 
@@ -473,7 +392,16 @@ function Remote:FireClient(player: Player, ...)
 	self:_getEventServer():FireClient(player, ...)
 end
 
--- Identical to UnreliableRemoteEvent:FireClient()
+--[=[
+	Fires the remote's event to the given player using an unreliable connection.
+	Identical to `UnreliableRemoteEvent:FireClient()`.
+
+	Also accessible as `FireClientFast`.
+
+	@server
+	@param player Player -- The player to fire the event to
+	@param ... any -- The arguments to pass to the client
+]=]
 function Remote:FireClientUnreliable(player: Player, ...)
 	assert(IS_SERVER, "FireClientUnreliable can only be called on the server")
 
@@ -486,8 +414,13 @@ end
 
 Remote.FireClientFast = Remote.FireClientUnreliable
 
--- Identical to RemoteEvent:FireAllClients() except it only fires to the players
--- provided in the list
+--[=[
+	Fires the remote's event to each player in the provided list.
+
+	@server
+	@param playerList {Player} -- The list of players to fire the event to
+	@param ... any -- The arguments to pass to the clients
+]=]
 function Remote:FireClientList(playerList: { Player }, ...)
 	if typeof(playerList) ~= "table" then
 		warn(`Attempt to fire Remote to non-table list ({tostring(playerList)})\n{debug.traceback()}`)
@@ -503,8 +436,16 @@ function Remote:FireClientList(playerList: { Player }, ...)
 	end
 end
 
--- Identical to UnreliableRemoteEvent:FireAllClients() except it only fires to
--- the players provided in the list
+--[=[
+	Fires the remote's event to each player in the provided list using an
+	unreliable connection.
+
+	Also accessible as `FireClientListFast`.
+
+	@server
+	@param playerList {Player} -- The list of players to fire the event to
+	@param ... any -- The arguments to pass to the clients
+]=]
 function Remote:FireClientListUnreliable(playerList: { Player }, ...)
 	if typeof(playerList) ~= "table" then
 		warn(`Attempt to fire Remote to non-table list ({tostring(playerList)})\n{debug.traceback()}`)
@@ -522,13 +463,26 @@ end
 
 Remote.FireClientListFast = Remote.FireClientListUnreliable
 
--- Identical to RemoteEvent:FireAllClients()
+--[=[
+	Fires the remote's event to all players. Identical to `RemoteEvent:FireAllClients()`.
+
+	@server
+	@param ... any -- The arguments to pass to the clients
+]=]
 function Remote:FireAllClients(...)
 	assert(IS_SERVER, "FireAllClients can only be called on the server")
 	self:_getEventServer():FireAllClients(...)
 end
 
--- Identical to UnreliableRemoteEvent:FireAllClients()
+--[=[
+	Fires the remote's event to all players using an unreliable connection.
+	Identical to `UnreliableRemoteEvent:FireAllClients()`.
+
+	Also accessible as `FireAllClientsFast`.
+
+	@server
+	@param ... any -- The arguments to pass to the clients
+]=]
 function Remote:FireAllClientsUnreliable(...)
 	assert(IS_SERVER, "FireAllClientsUnreliable can only be called on the server")
 	self:_getUnreliableEventServer():FireAllClients(...)
@@ -536,8 +490,16 @@ end
 
 Remote.FireAllClientsFast = Remote.FireAllClientsUnreliable
 
--- Identical to RemoteEvent:FireAllClients() except it excludes the provided
--- player(s)
+--[=[
+	Fires the remote's event to all players except the given player or list of
+	players.
+
+	Also accessible as `FireAllClientsExcept`.
+
+	@server
+	@param excluded Player | {Player} -- The player(s) to exclude
+	@param ... any -- The arguments to pass to the clients
+]=]
 function Remote:FireAllExcept(excluded: Player | { Player }, ...)
 	if typeof(excluded) == "Instance" and excluded:IsA("Player") then
 		excluded = { excluded }
@@ -555,8 +517,16 @@ end
 
 Remote.FireAllClientsExcept = Remote.FireAllExcept
 
--- Identical to UnreliableRemoteEvent:FireAllClients() except it excludes the
--- provided player(s)
+--[=[
+	Fires the remote's event to all players except the given player or list of
+	players using an unreliable connection.
+
+	Also accessible as `FireAllExceptFast`, `FireAllClientsExceptUnreliable`, and `FireAllClientsExceptFast`.
+
+	@server
+	@param excluded Player | {Player} -- The player(s) to exclude
+	@param ... any -- The arguments to pass to the clients
+]=]
 function Remote:FireAllExceptUnreliable(excluded: Player | { Player }, ...)
 	if typeof(excluded) == "Instance" and excluded:IsA("Player") then
 		excluded = { excluded }
@@ -576,7 +546,12 @@ Remote.FireAllExceptFast = Remote.FireAllExceptUnreliable
 Remote.FireAllClientsExceptUnreliable = Remote.FireAllExceptUnreliable
 Remote.FireAllClientsExceptFast = Remote.FireAllExceptUnreliable
 
--- Identical to RemoteEvent:FireServer()
+--[=[
+	Fires the remote's event to the server. Identical to `RemoteEvent:FireServer()`.
+
+	@client
+	@param ... any -- The arguments to pass to the server
+]=]
 function Remote:FireServer(...)
 	assert(IS_CLIENT, "FireServer can only be called on the client")
 	if not RunService:IsRunning() then
@@ -586,7 +561,15 @@ function Remote:FireServer(...)
 	self:_getEventClient():FireServer(...)
 end
 
--- Identical to UnreliableRemoteEvent:FireServer()
+--[=[
+	Fires the remote's event to the server using an unreliable connection.
+	Identical to `UnreliableRemoteEvent:FireServer()`.
+
+	Also accessible as `FireServerFast`.
+
+	@client
+	@param ... any -- The arguments to pass to the server
+]=]
 function Remote:FireServerUnreliable(...)
 	assert(IS_CLIENT, "FireServerUnreliable can only be called on the client")
 	self:_getUnreliableEventClient():FireServer(...)
@@ -594,9 +577,12 @@ end
 
 Remote.FireServerFast = Remote.FireServerUnreliable
 
--- Determines by context where to fire the event - if called from a client it
--- will use `:FireServer()`, if called from the server it will use
--- `:FireAllClients()`
+--[=[
+	Fires the remote's event, automatically routing by context: uses
+	`:FireServer()` on the client, or `:FireAllClients()` on the server.
+
+	@param ... any -- The arguments to pass
+]=]
 function Remote:Fire(...)
 	if not RunService:IsRunning() then
 		return
@@ -607,9 +593,15 @@ function Remote:Fire(...)
 	end
 end
 
--- Determines by context where to fire the event - if called from a client it
--- will use `:FireServerUnreliable()`, if called from the server it will use
--- `:FireAllClientsUnreliable()`
+--[=[
+	Fires the remote's event using an unreliable connection, automatically
+	routing by context: uses `:FireServerUnreliable()` on the client, or
+	`:FireAllClientsUnreliable()` on the server.
+
+	Also accessible as `FireFast`.
+
+	@param ... any -- The arguments to pass
+]=]
 function Remote:FireUnreliable(...)
 	if not RunService:IsRunning() then
 		return
@@ -622,22 +614,44 @@ end
 
 Remote.FireFast = Remote.FireUnreliable
 
--- Identical to RemoteFunction:InvokeClient()
+--[=[
+	Invokes the remote's function on the given player. Identical to
+	`RemoteFunction:InvokeClient()`.
+
+	@server
+	@param player Player -- The player to invoke the function on
+	@param ... any -- The arguments to pass
+	@return any
+	@yields
+]=]
 function Remote:InvokeClient(player: Player, ...): any
 	assert(IS_SERVER, "InvokeClient can only be called on the server")
 	return self:_getFunctionServer():InvokeClient(player, ...)
 end
 
--- Identical to RemoteFunction:InvokeServer()
+--[=[
+	Invokes the remote's function on the server. Identical to
+	`RemoteFunction:InvokeServer()`.
+
+	@client
+	@param ... any -- The arguments to pass
+	@return any
+	@yields
+]=]
 function Remote:InvokeServer(...): any
 	assert(IS_CLIENT, "InvokeServer can only be called on the client")
 	return self:_getFunctionClient():InvokeServer(...)
 end
 
--- Determines by context where to invoke the function - if called from a client
--- it will use `:InvokeServer()`, if called from the server it will use
--- `:InvokeClient()`. If invoking a client, the first argument should be the
--- target player.
+--[=[
+	Invokes the remote's function, automatically routing by context: uses
+	`:InvokeServer()` on the client, or `:InvokeClient()` on the server. When
+	calling from the server, the first argument should be the target `Player`.
+
+	@param ... any -- The arguments to pass (first arg is the target Player when called from server)
+	@return any
+	@yields
+]=]
 function Remote:Invoke(...): any
 	if IS_SERVER then
 		local args = { ... }
@@ -648,8 +662,15 @@ function Remote:Invoke(...): any
 	end
 end
 
--- Identical to setting RemoteFunction.OnServerInvoke or
--- RemoteFunction.OnClientInvoke to the provided callback function
+--[=[
+	Sets the callback for the remote's function. Equivalent to setting
+	`RemoteFunction.OnServerInvoke` or `RemoteFunction.OnClientInvoke`.
+	Context is determined automatically.
+
+	`OnServerInvoke` and `OnClientInvoke` are aliases for this method.
+
+	@param callback function -- The callback to invoke when the function is called
+]=]
 function Remote:OnInvoke(callback: (any) -> ()?)
 	local function callbackWithPrint(...)
 		if not callback then
@@ -681,13 +702,18 @@ end
 Remote.OnServerInvoke = Remote.OnInvoke
 Remote.OnClientInvoke = Remote.OnInvoke
 
--- Returns whether or not the RemoteEvent has already requested to the server to
--- get the _event object
-function Remote:HasRequestedEvent(): boolean
-	return self._event ~= nil
-end
+--[=[
+	@function GetRemote
+	@within GetRemote
 
--- Return function
+	Returns a [Remote](/api/Remote) object for the given name, creating it if it does not
+	already exist. The same object is returned for repeated calls with the same
+	name.
+
+	@param name string -- The name of the remote
+	@param forceLoad RemoteForceLoad? -- Optionally pre-create specific underlying remote instances
+	@return Remote
+]=]
 
 if not RunService:IsRunning() then
 	return function(name: string, forceLoad: RemoteForceLoad?): Remote

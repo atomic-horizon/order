@@ -4,16 +4,18 @@
 	Module: PermissionService.lua
 	Version: 1.0.0
 
+]]
+
+--[=[
+	@class PermissionService
+
 	Handles centralized permissions for different features.
 
---]]
-
---[[ Setup
-
-	1. Update the PERMISSIONS table to include appropriate permissions for the
-	   new group hosting the project.
-
-]]
+	:::note
+	Update the `GROUP_PERMISSIONS` table to include appropriate permissions
+	for the group hosting the project.
+	:::
+]=]
 
 -- Dependencies
 
@@ -58,8 +60,15 @@ local PermissionsCache = CacheService:CreateCache("Permissions", 50, 60)
 
 -- Public Functions
 
--- Checks whether the player has permissions for the given label. Returns true
--- if they do, or false if their rank is too low.
+--[=[
+	Checks whether the player has the given permission. Returns `true` if they
+	do, or `false` if their rank is too low.
+
+	@param player Player -- The player to check
+	@param permission string -- The permission label to check against
+	@return boolean -- Whether the player has the permission
+	@yields
+]=]
 function PermissionService:HasPermission(player: Player, permission: string): boolean
 	if (player.UserId < 0 and TEST_PLAYERS_ALL_PERMS) or ADMINS[player.UserId] then
 		return true
