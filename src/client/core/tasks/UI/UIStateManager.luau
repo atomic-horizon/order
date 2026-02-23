@@ -1,13 +1,21 @@
---[[
+--[[ File Info
+
 	File: UIStateManager.lua
 	Author(s): Refactor
-	Version: 1.0.0-order
+	Version: 1.0.0-atomicui
 
 	https://github.com/rfct0r/UIStateManager
 
-	It should be noted that this is supposed to be a standalone State Manager
-	for handling ONLY UI States for BasicPane derivatives.
 ]]
+
+--[=[
+	@class UIStateManager
+	@client
+
+	Handles UI state management for [AtomicPanes](/api/AtomicPane). Designed as
+	a standalone state manager that controls which UI components are visible
+	based on named states.
+]=]
 
 --[ Roblox Services ]--
 
@@ -21,6 +29,16 @@ local UIStateManager = { Priority = 9999 }
 
 --[ Exports & Types & Defaults ]--
 
+--[=[
+	@interface StateProperties
+	@within UIStateManager
+
+	.Hides {string}? -- Component names to hide when this state is active. Use `"*"` to hide all.
+	.Shows {string}? -- Component names to show when this state is active. Use `"*"` to show all.
+	.CoreGui {Shows: {string}?, Hides: {string}?}? -- CoreGui elements to show or hide
+	.Blocks {string}? -- State names that cannot be transitioned to from this state. Use `"*"` to block all.
+	.GamepadCursorEnabled boolean? -- Whether the gamepad cursor should be enabled in this state
+]=]
 export type StateProperties = {
 	Hides: { string }?,
 	Shows: { string }?,
@@ -185,23 +203,17 @@ end
 
 --[ Public Functions ]--
 
---[[
-   Set the UIState to the desired state.
+--[=[
+	Sets the current UI state. Hides and shows registered components according
+	to the state's `StateProperties`. Returns `false` and a reason string if
+	the transition is blocked by the current state.
 
-   Parameters:
-    - state (string): The name of the state to set.
-
-   Returns:
-    - success (boolean): Returns a state to inform if state was set or blocked. If false, state was blocked.
-	- reason (string?): Returns the reason as to why the state was blocked.
-
-   Description:
-    This function sets the UIState to the specified state and performs associated operations,
-    such as hiding/showing components based on the configuration of that state.
-    If the specified state does not exist, a warning is issued and no state change occurs.
-    If the state configuration includes CoreGui changes, the corresponding CoreGui components
-    are shown/hidden accordingly.
-]]
+	@param state string -- The name of the state to transition to
+	@param forceState boolean? -- If true, bypasses any block rules on the current state
+	@param targetGuiObject Instance? -- The GuiObject to target for gamepad cursor focus
+	@return boolean -- Whether the state was successfully set
+	@return string? -- The reason the state was blocked, if applicable
+]=]
 function UIStateManager:SetState(state: string, forceState: boolean?, targetGuiObject: Instance?): ()
 	local uiState = States[state]
 
@@ -249,22 +261,13 @@ function UIStateManager:SetState(state: string, forceState: boolean?, targetGuiO
 	return true
 end
 
---[[
-   Register a new UIState with the specified name and properties.
+--[=[
+	Registers a new UI state with the given name and properties. If a state
+	with the same name already exists, registration is skipped with a warning.
 
-   Parameters:
-    - name (string): The name of the UIState to register.
-    - properties (StateProperties): The properties and configuration for the UIState.
-
-   Returns:
-    - None
-
-   Description:
-    This function registers a new UIState with the given name and properties.
-    If a UIState with the same name already exists, a warning is issued, and the registration is skipped.
-    The UIState properties define the configuration for the state, including the components to hide/show
-    and any CoreGui changes.
-]]
+	@param name string -- The name to register the state under
+	@param properties StateProperties -- The configuration for the state
+]=]
 function UIStateManager:RegisterState(name: string, properties: StateProperties): ()
 	if States[name] then
 		warn(`UIState {name} already exists.`)
@@ -274,23 +277,15 @@ function UIStateManager:RegisterState(name: string, properties: StateProperties)
 	States[name] = properties
 end
 
---[[
-   Register a new UIComponent with the specified name and class.
+--[=[
+	Registers a UI component under the given name so it can be referenced in
+	state configurations. The component must implement `:Show()` and `:Hide()`
+	methods. If a component with the same name is already registered, the
+	registration is skipped with a warning.
 
-   Parameters:
-    - name (string): The name of the UIComponent to register.
-    - class ({}): The class representing the UIComponent.
-
-   Returns:
-    - None
-
-   Description:
-    This function registers a new UIComponent with the given name and class.
-    If a UIComponent with the same name already exists, a warning is issued, and the registration is skipped.
-    The UIComponent class represents the behavior and functionality of the component.
-    The class should include the methods :Hide() and :Show() to control the visibility of the component.
-    Once registered, the UIComponent can be used in the configuration of UIStates to show or hide the component as needed.
-]]
+	@param name string -- The name to register the component under
+	@param class {} -- The component object, must have `:Show()` and `:Hide()` methods
+]=]
 function UIStateManager:RegisterComponent(name: string, class: { [any]: any }): ()
 	if Components[name] then
 		warn(`UIComponent {name} already exists.`)
@@ -308,6 +303,14 @@ function UIStateManager:RegisterComponent(name: string, class: { [any]: any }): 
 	Components[name] = class
 end
 
+--[=[
+	Unregisters a previously registered UI component by name. Does nothing if
+	the component is not registered or was registered under a different class
+	reference.
+
+	@param name string -- The name the component was registered under
+	@param class {} -- The original class reference used during registration
+]=]
 function UIStateManager:UnregisterComponent(name: string, class: { [any]: any }): ()
 	if not Components[name] then
 		return
@@ -320,22 +323,21 @@ function UIStateManager:UnregisterComponent(name: string, class: { [any]: any })
 	Components[name] = nil
 end
 
---[[
-   Returns the current UI State.
+--[=[
+	Returns the name of the current UI state.
 
-   Parameters:
-    - None
-
-   Returns:
-    - string
-
-   Description:
-	If there is a current state this method will return it as a string.
-]]
+	@return string
+]=]
 function UIStateManager:GetState(): string
 	return self.currentState
 end
 
+--[=[
+	Returns whether the named component is currently visible.
+
+	@param name string -- The name of the registered component to check
+	@return boolean
+]=]
 function UIStateManager:IsComponentShowing(name: string): boolean
 	local component = Components[name]
 	if not component then
@@ -346,38 +348,22 @@ function UIStateManager:IsComponentShowing(name: string): boolean
 	return component:IsVisible()
 end
 
---[[
-   Revert to the previous UIState.
-
-   Parameters:
-    - None
-
-   Returns:
-    - None
-
-   Description:
-    This function reverts the UIState to the previous state if available.
-    It checks if a previous state exists and calls the `SetState` function with the previous state as the parameter.
-]]
+--[=[
+	Reverts to the previous UI state, if one exists.
+]=]
 function UIStateManager:PreviousState(): ()
 	if self.previousState then
 		self:SetState(self.previousState)
 	end
 end
 
---[[
-	Set state to default state.
+--[=[
+	Sets the current state to the registered default state. Returns `nil` and
+	a reason string if no default state has been registered.
 
-   Parameters:
-    - None
-
-   Returns:
-    - boolean | nil `success state`
-	- string? `failure reason`
-
-   Description:
-	Checks if a DefaultState is registered and if there is a default state it will set current state to it.
-]]
+	@return boolean? -- `true` on success, `nil` if no default is registered
+	@return string? -- The reason for failure, if applicable
+]=]
 function UIStateManager:SetDefault(): (boolean | nil, string?)
 	if not self.defaultState then
 		return nil, "Could not set state to default. No default state registered."
@@ -387,18 +373,14 @@ function UIStateManager:SetDefault(): (boolean | nil, string?)
 	return true
 end
 
---[[
-	Registers a default state for `:SetDefault()` method.
+--[=[
+	Registers the named state as the default state for `:SetDefault()`. Returns
+	`nil` and a reason string if the state has not been registered.
 
-   Parameters:
-    - string `state name`
-
-   Returns:
-    - boolean | nil `success state`
-	- string? `failure reason`
-
-   Description:
-]]
+	@param name string -- The name of the state to use as the default
+	@return boolean? -- `true` on success, `nil` if the state does not exist
+	@return string? -- The reason for failure, if applicable
+]=]
 function UIStateManager:RegisterDefaultState(name: string): (boolean | nil, string?)
 	if not States[name] then
 		return nil, "Could not set default UI state. State did not exist."
@@ -408,33 +390,24 @@ function UIStateManager:RegisterDefaultState(name: string): (boolean | nil, stri
 	return true
 end
 
---[[
-	Registers an event hook to listen for specific events triggered by the UIStateManager
-	and execute custom callback functions in response.
+--[=[
+	Registers a callback to be invoked when the specified event occurs.
 
+	Valid event names and their callback argument order:
+	- `StateChange(newState, oldState)`
+	- `BeforeStateChange(oldState, newState)`
+	- `AfterStateChange(newState, oldState)`
+	- `CoreGuiChange(newState, oldState)`
 
-	Valid States & Argument Order for Callback:
-	- StateChange(newState, oldState)
-	- BeforeStateChange (oldState, newState)
-	- AfterStateChange (newState, oldState)
-	- CoreGuiChange (newState, oldState)
+	```lua
+	UIStateManager:RegisterEventHook("StateChange", function(newState, oldState)
+		print("UI State changed to:", newState)
+	end)
+	```
 
-	Parameters:
-    - eventName (string): The name of the event hook.
-    - callback (function): The callback function to be executed when the event occurs. It should accept a string parameter representing the state associated with the event.
-
-   Returns:
-    - None
-
-   Description:
-    This function allows you to register an event hook to listen for specific events triggered by the UIStateManager. The event hook can be used to execute custom logic or trigger additional actions in response to the events.
-
-   Example:
-    UIStateManager:RegisterEventHook("StateChange", function(state)
-      print("UI State changed to:", state)
-      -- Perform additional actions based on the state change
-    end)
-]]
+	@param eventName string -- The name of the event to hook into
+	@param callback function -- Called with (newState, oldState) when the event fires
+]=]
 function UIStateManager:RegisterEventHook(eventName: string, callback: (newState: string, oldState: string) -> ()): ()
 	if EventHooks[eventName] then
 		table.insert(EventHooks[eventName], callback)

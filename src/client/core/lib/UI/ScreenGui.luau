@@ -6,31 +6,37 @@
 
 ]]
 
+--[=[
+	@class ScreenGui
+	@client
+
+	Utility for creating `ScreenGui` instances with sensible defaults.
+	Automatically parents to `PlayerGui` at runtime, or to `CoreGui` when
+	running inside a story environment.
+]=]
+
 -- Services
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
--- Dependencies
-
--- Types
-
 -- Module Declaration
 
 local ScreenGui = {}
-
--- Constants
-
--- Global Variables
 
 -- Objects
 
 local LocalPlayer = Players.LocalPlayer
 
--- Private Functions
-
 -- Public Functions
 
+--[=[
+	Creates a new `ScreenGui` with `ResetOnSpawn` disabled and
+	`ZIndexBehavior` set to `Sibling`, then parents it to `PlayerGui`.
+
+	@param name string -- The name to assign to the ScreenGui
+	@return ScreenGui
+]=]
 function ScreenGui.new(name: string)
 	local gui = Instance.new("ScreenGui")
 	gui.Name = name
