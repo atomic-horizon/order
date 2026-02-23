@@ -20,12 +20,8 @@ copyright = "Copyright © 2026 Atomic Horizon LLC"
 title = "Docs"
 
   [[footer.links.items]]
-  label = "Introduction"
-  to = "/docs/intro"
-
-  [[footer.links.items]]
   label = "Getting Started"
-  to = "/docs/gettingstarted"
+  to = "/docs/intro"
 
   [[footer.links.items]]
   label = "Usage"
