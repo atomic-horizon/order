@@ -40,7 +40,7 @@ local NewTask = {
 function NewTask:Prep()
     print("Task is prepped.")
 end
-s
+
 function NewTask:Init()
 	print("Task is running!")
 end
