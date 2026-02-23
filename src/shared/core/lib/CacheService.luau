@@ -1,10 +1,16 @@
---[[
-    CacheService.lua
-    ChiefWildin
-    Version: 1.3.0
+--[[ File Info
 
-    Simple module for caching any data.
+	Author: ChiefWildin
+	Module: CacheService.lua
+	Version: 1.3.0
+
 ]]
+
+--[=[
+	@class CacheService
+
+	Simple module for caching any data.
+]=]
 
 -- Root
 
@@ -12,6 +18,14 @@ local CacheService = {}
 
 -- Types
 
+--[=[
+	@interface Cache
+	@within CacheService
+
+	.EntryLimit number -- Maximum number of entries the cache will hold
+	.EntryAgeLimit number -- Number of seconds entries are allowed to exist
+	.Entries {[string]: {Data: any, EntryTime: number}} -- The cached entries
+]=]
 export type Cache = {
 	EntryLimit: number,
 	EntryAgeLimit: number,
@@ -49,6 +63,13 @@ end
 
 -- API Functions
 
+--[=[
+	@class Cache
+
+	A named cache object returned by [CacheService:CreateCache()](/api/CacheService#CreateCache). Stores
+	key-value pairs with an age limit and entry limit.
+]=]
+
 local Cache = {} :: Cache
 Cache.__index = Cache
 
@@ -69,6 +90,13 @@ function Cache.new(name: string, entryLimit: number?, entryAgeLimit: number?): C
 	return self
 end
 
+--[=[
+	Returns the cached value at the given index, or `nil` if the entry is
+	missing or expired.
+
+	@param index string -- The cache key to look up
+	@return any? -- The cached value, or nil if missing or expired
+]=]
 function Cache:Get(index: string): any?
 	if not index then
 		return nil
@@ -83,6 +111,14 @@ function Cache:Get(index: string): any?
 	return self.Entries[index].Data
 end
 
+--[=[
+	Returns the cached value at the given index. If it is missing or expired,
+	calls `addCallback` to produce a value, caches it, and returns it.
+
+	@param index string -- The cache key to look up
+	@param addCallback function -- Called to produce the value if not cached
+	@return any? -- The cached or newly produced value
+]=]
 function Cache:GetOrAdd(index: string, addCallback: () -> any?): any?
 	local data = self:Get(index)
 
@@ -94,6 +130,12 @@ function Cache:GetOrAdd(index: string, addCallback: () -> any?): any?
 	return data
 end
 
+--[=[
+	Stores the given value at the specified index.
+
+	@param index string -- The cache key to store the value under
+	@param data any -- The value to cache
+]=]
 function Cache:Set(index: string, data: any)
 	if not index then
 		return
@@ -105,6 +147,14 @@ function Cache:Set(index: string, data: any)
 	}
 end
 
+--[=[
+	Returns the named `Cache`, creating it if it does not already exist.
+
+	@param cacheName string -- The name of the cache
+	@param entryLimit number? -- Maximum number of entries (default 1000)
+	@param entryAgeLimit number? -- Entry lifetime in seconds (default 3600)
+	@return Cache
+]=]
 function CacheService:CreateCache(cacheName: string, entryLimit: number?, entryAgeLimit: number?): Cache
 	local cache = Caches[cacheName]
 	if not cache then
@@ -115,18 +165,37 @@ function CacheService:CreateCache(cacheName: string, entryLimit: number?, entryA
 	return cache
 end
 
--- Sets a value in a cache.
+--[=[
+	Stores a value at the given index in the named cache.
+
+	@param cacheName string -- The name of the cache
+	@param index string -- The cache key
+	@param data any -- The value to cache
+]=]
 function CacheService:Set(cacheName: string, index: string, data: any)
 	Cache.new(cacheName):Set(index, data)
 end
 
--- Returns a value in a cache
+--[=[
+	Returns the cached value at the given index, or `nil` if missing or expired.
+
+	@param cacheName string -- The name of the cache
+	@param index string -- The cache key to look up
+	@return any?
+]=]
 function CacheService:Get(cacheName: string, index: string)
 	return Cache.new(cacheName):Get(index)
 end
 
--- Returns a value in a cache, or uses the addCallback to find and add it if it
--- doesn't exist
+--[=[
+	Returns the cached value at the given index. If missing or expired, calls
+	`addCallback` to produce a value, caches it, and returns it.
+
+	@param cacheName string -- The name of the cache
+	@param index string -- The cache key to look up
+	@param addCallback function -- Called to produce the value if not cached
+	@return any?
+]=]
 function CacheService:GetOrAdd(cacheName: string, index: string, addCallback: () -> any?): any?
 	return Cache.new(cacheName):GetOrAdd(index, addCallback)
 end

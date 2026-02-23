@@ -4,34 +4,14 @@
 	Author(s): ChiefWildin
 	Version: 2.4.0
 
+]]
+
+--[=[
+	@class DataController
+	@client
+
 	Handles data replication coming from the server.
-]]
-
---[[ API
-		::GetDataReplica()
-			Returns the Replica object that contains player data.
-
-		::GetValue(valueKey: string): any?
-			Returns the value at the specified key in the player data table.
-
-		::GetData()
-			Returns the top-level table of player data, containing both the
-			session and profile data tables. READ-ONLY, DO NOT ATTEMPT TO WRITE
-
-		::Observe(path: string, callback: (newValue: any, oldValue: any) -> ())
-			Sets a callback function to be run when the value in path is
-			changed. Note that the path is a string that specifies the location
-			from the top-level player data table.
-			Example:
-			```lua
-				local function printValueChange(newValue, oldValue)
-					print("Value changed from", oldValue, " to", newValue)
-				end
-	            DataController:Observe("SomeKey.SomeOtherKey", printValueChange)
-				-- OR
-	            DataController:Observe({"SomeKey", "SomeOtherKey"}, printValueChange)
-			```
-]]
+]=]
 
 -- Services
 
@@ -78,7 +58,13 @@ end
 
 -- Public functions
 
--- Returns the Replica object that contains player data
+--[=[
+	Returns the `Replica` object that contains player data. Yields until the
+	replica is available.
+
+	@return Replica
+	@yields
+]=]
 function DataController:GetDataReplica(): Replica
 	while not PlayerDataReplica do
 		if not RunService:IsRunning() then
@@ -94,13 +80,33 @@ function DataController:GetDataReplica(): Replica
 	return PlayerDataReplica
 end
 
--- Returns the full table of player data
-function DataController:GetData(): {}
+--[=[
+	Returns the top-level player data table containing both session and profile
+	data.
+
+	:::warning
+	This table is read-only. Do not attempt to write to it directly.
+	:::
+
+	@return { [string]: any }
+]=]
+function DataController:GetData(): { [string]: any }
 	return if RunService:IsRunning() then self:GetDataReplica().Data else ProfileTemplate
 end
 
--- Returns the value at the specified path in the player data table. Paths can
--- be of the form "Key1.Key2.Key3" or {"Key1", "Key2", "Key3"}
+--[=[
+	Returns the value at the specified path in the player data table. Paths can
+	be dot-separated strings or string arrays.
+
+	```lua
+	DataController:GetValue("SomeKey.SomeOtherKey")
+	-- OR
+	DataController:GetValue({"SomeKey", "SomeOtherKey"})
+	```
+
+	@param keyPath string | {string} -- The dot-separated path or array of keys
+	@return any?
+]=]
 function DataController:GetValue(keyPath: string | { string }): any?
 	local indices
 	if typeof(keyPath) == "string" then
@@ -120,15 +126,36 @@ function DataController:GetValue(keyPath: string | { string }): any?
 	end
 end
 
--- Immediately processes the callback on the current value and listens for
--- changes.
+--[=[
+	Immediately invokes `callback` with the current value at `path`, then
+	listens for changes and invokes it again on every subsequent update.
+
+	```lua
+	DataController:Observe("SomeKey.SomeOtherKey", function(newValue, oldValue)
+		print("Value changed from", oldValue, "to", newValue)
+	end)
+	```
+
+	@param path string -- The dot-separated path to observe
+	@param callback function -- Called with (newValue, oldValue) immediately and on every change
+	@return RBXScriptConnection
+]=]
 function DataController:Observe(path: string, callback: (newValue: any, oldValue: any) -> ()): RBXScriptConnection
 	local value = DataController:GetValue(path)
 	task.spawn(callback, value, value)
 	return self:GetDataReplica():ListenToChange(path, callback)
 end
 
--- Sets a callback function to be run when the value in path is changed.
+--[=[
+	Sets a callback to be run when the value at `path` changes. If
+	`runImmediately` is true, behaves identically to `Observe` and invokes the
+	callback with the current value right away.
+
+	@param path string | {string} -- The path to listen to
+	@param callback function -- Called with (newValue, oldValue) on change
+	@param runImmediately boolean? -- Whether to invoke the callback immediately with the current value
+	@return RBXScriptConnection
+]=]
 function DataController:SetValueCallback(
 	path: string | { string },
 	callback: (newValue: any, oldValue: any) -> (),
