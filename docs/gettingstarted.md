@@ -10,6 +10,10 @@ import Link from "@docusaurus/Link";
 # Getting Started
 To get started working with Order, you can use any of the options detailed below. Be sure to check out [the API](/order/api) for details on how everything works!
 
+---
+
+## Installation
+
 <Tabs groupId="installation-kind">
 <TabItem value="rojo" label="Rojo" default>
 
@@ -47,3 +51,86 @@ I highly recommend the professional environment that Rojo offers, but if you'd l
 
 </TabItem>
 </Tabs>
+---
+## Creating your first task
+
+Tasks are the primary way to run code at runtime in Order. Any module placed inside a `tasks` folder will be automatically discovered and initialized by the framework.
+
+### 1) Create the task file
+Inside the appropriate context folder (`client`, `server`, or `shared`), create a `tasks` subfolder if one doesn't already exist, then add a new `.luau` file inside it. For example, to create a server-side task:
+
+```
+src/
+  server/
+    core/
+      tasks/
+        MyTask.luau   ← your new task
+```
+
+### 2) Write the task module
+
+A task is a regular Lua table returned by the module. Add `:Prep()` for synchronous setup that runs before everything else, and `:Init()` for your main async logic that runs after all prep work is done. Both are optional.
+
+```lua
+local PlayerUtils = shared("PlayerUtils")
+
+local MyTask = {
+    Priority = 0, -- optional, higher values initialize first
+}
+
+function MyTask:Prep()
+    -- Synchronous setup — runs before :Init() on any task.
+    -- Safe to set up state here, but avoid yielding.
+    self.Players = {}
+end
+
+function MyTask:Init()
+    -- Async runtime logic — runs after all :Prep() calls finish.
+    PlayerUtils:PlayerAdded(function(player)
+		...
+	end)
+    print("MyTask initialized!")
+end
+
+return MyTask
+```
+
+### 3) Load other modules from your task
+
+Call `shared()` at the top of the file, before defining the task table, to load dependencies by name, partial path, or direct reference:
+
+```lua
+local PlayerData = shared("PlayerData")
+local GetRemote   = shared("GetRemote")
+
+local MyTask = {}
+
+function MyTask:Init()
+    GetRemote("Counter"):OnEvent(function(player)
+        PlayerData:IncrementNumValue(player, "Counter", 1)
+    end)
+end
+
+return MyTask
+```
+
+For modules involved in a **cyclic dependency**, you can still call `shared()` at the top level — but any code that actually *uses* the returned value must be inside a function:
+
+```lua
+local CyclicModule = shared("CyclicModule") -- fine at the top level
+
+local MyTask = {}
+
+function MyTask:Init()
+    CyclicModule:DoThing() -- safe: accessed inside a function, not bare code
+end
+
+return MyTask
+```
+
+:::warning
+Bare top-level code that directly calls or indexes a cyclic dependency will not work. Order detects this and will skip initialization on that module with a warning.
+:::
+
+Once the framework initializes, your task will be picked up automatically — no registration or additional wiring needed.
+
