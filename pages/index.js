@@ -1,3 +1,4 @@
+import Head from "@docusaurus/Head"
 import Link from "@docusaurus/Link"
 import useDocusaurusContext from "@docusaurus/useDocusaurusContext"
 import CodeBlock from "@theme/CodeBlock"
@@ -288,15 +289,30 @@ function HomepageHeader() {
 	)
 }
 
+const DESCRIPTION =
+	"A configurable module-loader framework for Roblox featuring fast lookups, cyclic dependency support, and a fully customizable initialization pipeline."
+const TITLE = "Order"
+
 export default function Home() {
-	const { siteConfig } = useDocusaurusContext()
 	return (
-		<Layout title={siteConfig.title} description={siteConfig.tagline}>
-			<HomepageHeader />
-			<main>
-				<HomepageFeatures />
-				<CodeShowcase />
-			</main>
-		</Layout>
+		<>
+			<Layout title={TITLE} description={DESCRIPTION}>
+				<HomepageHeader />
+				<main>
+					<HomepageFeatures />
+					<CodeShowcase />
+				</main>
+			</Layout>
+			<Head>
+				<title>{TITLE}</title>
+				<meta property="og:type" content="website" />
+				<meta property="og:title" content={TITLE} />
+				<meta property="og:description" content={DESCRIPTION} />
+				<meta property="og:image" content="https://atomic-horizon.github.io/order/img/embed_banner.png" />
+				<meta property="twitter:domain" content="atomic-horizon.github.io" />
+				<meta property="twitter:url" content="https://atomic-horizon.github.io/order/" />
+				<meta name="twitter:image" content="https://atomic-horizon.github.io/order/img/embed_banner.png" />
+			</Head>
+		</>
 	)
 }
