@@ -5,7 +5,7 @@ changelog = true
 [docusaurus]
 onBrokenLinks = "warn"
 url = "https://atomic-horizon.github.io"
-baseUrl = "/order/"
+baseUrl = "/"
 favicon = "/img/favicon.ico"
 
 [home]
