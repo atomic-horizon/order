@@ -8,7 +8,7 @@ import TabItem from "@theme/TabItem";
 import Link from "@docusaurus/Link";
 
 # Getting Started
-To get started working with Order, you can use any of the options detailed below. Be sure to check out [the API](/order/api) for details on how everything works!
+To get started working with Order, you can use any of the options detailed below. Be sure to check out [the API](/api) for details on how everything works!
 
 ---
 

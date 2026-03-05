@@ -25,7 +25,7 @@ title = "Docs"
 
   [[footer.links.items]]
   label = "Usage"
-  to = "/docs/setup"
+  to = "/docs/usage"
 
   [[footer.links.items]]
   label = "Special Notes"
