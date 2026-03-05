@@ -1,0 +1,1 @@
+"use strict";(self.webpackChunkdocs=self.webpackChunkdocs||[]).push([[8582],{84410:s=>{s.exports=JSON.parse('{"sourceUrl":"https://github.com/atomic-horizon/order/blob/master","baseUrl":"/","classOrder":[],"apiCategories":[]}')}}]);
