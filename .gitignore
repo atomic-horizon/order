@@ -13,3 +13,4 @@ build/
 wally.lock
 
 mcp.json
+sourcemap.json

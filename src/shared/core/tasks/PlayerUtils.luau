@@ -73,9 +73,7 @@ function PlayerUtils:OnPlayerAdded(callback: (player: Player, maid: Maid) -> (),
 	end
 
 	for _, player in Players:GetPlayers() do
-		task.spawn(function()
-			callback(player, self:GetPlayerMaid(player))
-		end)
+		task.spawn(callback, player, self:GetPlayerMaid(player))
 	end
 end
 
@@ -148,20 +146,24 @@ end
 -- Initialization
 
 function PlayerUtils:Init()
-	Players.PlayerAdded:Connect(function(player)
-		local playerMaid = PlayerUtils:GetPlayerMaid(player)
-
-		for _, callback in JoinCallbacks do
-			task.spawn(callback, player, playerMaid)
-		end
-	end)
-
 	Players.PlayerRemoving:Connect(function(player)
 		if PlayerMaids[player] then
 			PlayerMaids[player]:Destroy()
 			PlayerMaids[player] = nil
 		end
 	end)
+
+	local function onPlayerAdded(player: Player)
+		local playerMaid = PlayerUtils:GetPlayerMaid(player)
+
+		for _, callback in JoinCallbacks do
+			task.spawn(callback, player, playerMaid)
+		end
+	end
+	Players.PlayerAdded:Connect(onPlayerAdded)
+	for _, player in Players:GetPlayers() do
+		onPlayerAdded(player)
+	end
 end
 
 return PlayerUtils

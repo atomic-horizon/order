@@ -22,7 +22,6 @@ local LightingController = {}
 -- Dependencies
 
 local AnimNation = shared("AnimNation") ---@module AnimNation
-local Get = shared("Get") ---@module Get
 
 -- Types
 
