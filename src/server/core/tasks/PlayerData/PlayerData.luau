@@ -26,10 +26,10 @@ local PlayerData = {}
 
 -- Dependencies
 
-local ProfileService = shared("ProfileService") ---@module ProfileService
-local ProfileTemplate = shared("ProfileTemplate") ---@module ProfileTemplate
-local rcall = shared("rcall") ---@module rcall
-local ReplicaServiceListeners = shared("ReplicaServiceListeners") ---@module ReplicaServiceListeners
+local ProfileService = shared("ProfileService")
+local ProfileTemplate = shared("ProfileTemplate")
+local rcall = shared("rcall")
+local ReplicaServiceListeners = shared("ReplicaServiceListeners")
 
 -- Types
 
@@ -46,6 +46,7 @@ local STORE_NAME = if not RunService:IsStudio() and not workspace:GetAttribute("
 	else "PlayerData_Testing2"
 
 -- Global variables
+
 local PlayerCache = {}
 local PlayerProfiles = {}
 local ProcessedPlayers = {}
@@ -175,7 +176,7 @@ function PlayerData:GetValue(player: Player, keyPath: string | { string }): any?
 		warn(
 			`Attempt to get value ({if typeof(keyPath) == "table" then table.concat(keyPath, ".") else keyPath}) from removed player\n{debug.traceback()}`
 		)
-		return
+		return nil
 	end
 
 	local indices
@@ -194,6 +195,8 @@ function PlayerData:GetValue(player: Player, keyPath: string | { string }): any?
 		end
 		currentLocation = currentLocation[index]
 	end
+
+	return nil
 end
 
 --[=[
@@ -239,7 +242,7 @@ end
 ]=]
 function PlayerData:IncrementNumValue(player: Player, keyPath: string | { string }, increment: number): number?
 	if typeof(increment) ~= "number" or increment == 0 then
-		return
+		return nil
 	end
 
 	local currentValue = self:GetValue(player, keyPath) or 0
@@ -249,6 +252,8 @@ function PlayerData:IncrementNumValue(player: Player, keyPath: string | { string
 	else
 		warn("Attempted to increment a non-number value at keyPath", keyPath)
 	end
+
+	return nil
 end
 
 --[=[

@@ -1,8 +1,8 @@
---[[ FILE
+--[[ File Info
 
     Author: TactBacon, ChiefWildin
     Module: Sounds.lua
-    Version: 2.0.0
+    Version: 2.0.1
 
 ]]
 
@@ -77,8 +77,10 @@ function Sounds:PlayExistingSound(sound: AudioPlayer, varyPitch: number?, durati
 	if varyPitch or duration then
 		sound.AutoLoad = true
 
-		if not sound:GetAttribute("OriginalPlaybackSpeed") then
-			sound:SetAttribute("OriginalPlaybackSpeed", sound.PlaybackSpeed)
+		local speed = sound:GetAttribute("OriginalPlaybackSpeed")
+		if not speed then
+			speed = sound.PlaybackSpeed
+			sound:SetAttribute("OriginalPlaybackSpeed", speed)
 		end
 
 		-- if not sound.IsReady then
@@ -107,8 +109,7 @@ function Sounds:PlayExistingSound(sound: AudioPlayer, varyPitch: number?, durati
 		end
 
 		local pitch = varyPitch or 0
-		sound.PlaybackSpeed = (sound.TimeLength / (duration or sound.TimeLength))
-				* sound:GetAttribute("OriginalPlaybackSpeed")
+		sound.PlaybackSpeed = (sound.TimeLength / (duration or sound.TimeLength)) * speed
 			+ RandomObj:NextNumber(-pitch, pitch)
 	end
 
@@ -155,8 +156,8 @@ function Sounds:PlaySound(
 		wire.SourceInstance = sound
 		wire.Parent = sound
 
-		local soundAdornee: Part?
-		local emitter: AudioEmitter?
+		local soundAdornee: Part
+		local emitter: AudioEmitter
 		if not position then
 			local originalWire = originalSound:FindFirstChildWhichIsA("Wire")
 			wire.TargetInstance = if originalWire

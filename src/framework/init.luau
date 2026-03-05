@@ -1,9 +1,10 @@
 --[[
 
-	order.
+	Order
+	@ChiefWildin
+	https://order.atomichorizon.net/
 
-	A configurable module-based framework for Roblox, written by @ChiefWildin.
-	Full documentation - https://michaeldougal.github.io/order/
+	A configurable module-based framework for Roblox.
 
 ]]
 
@@ -22,7 +23,7 @@ local Settings = require(script:WaitForChild("Settings")) ---@module Settings
 
 local Order = {
 	PlaceType = Settings.PlaceTypes[game.PlaceId] or "Generic",
-	Version = "3.0.0",
+	Version = "3.0.1",
 }
 
 type Initializer = Settings.Initializer
@@ -229,7 +230,7 @@ local function expandNameIndex(levelCap: number)
 			for _, module in moduleData do
 				indexNames(module, levelCap)
 			end
-		elseif typeof(moduleData) == "Instance" then
+		elseif typeof(moduleData) == "Instance" and moduleData:IsA("ModuleScript") then
 			indexNames(moduleData, levelCap)
 		end
 	end
@@ -261,7 +262,8 @@ function Order.__call(_: {}, target: string | ModuleScript, suppressWarnings: bo
 			-- A table represents multiple possible modules for the given alias
 			-- string, it's unclear which the developer wants
 			local trace = debug.traceback()
-			local trim = string.sub(trace, string.find(trace, "__call") + 7, string.len(trace) - 1)
+			local prefix = string.find(trace, "__call")
+			local trim = string.sub(trace, if prefix then prefix + 7 else 1, string.len(trace) - 1)
 			local warning = trim .. ": Multiple modules found for '" .. target .. "' - please be more specific:\n"
 			local numDuplicates = #module
 
@@ -306,7 +308,8 @@ function Order.__call(_: {}, target: string | ModuleScript, suppressWarnings: bo
 				-- Ancestor index expansion has already reached all possibly
 				-- referenced levels, so we just don't know where the module is
 				local trace = debug.traceback()
-				local trim = string.sub(trace, string.find(trace, "__call") + 7, string.len(trace) - 1)
+				local prefix = string.find(trace, "__call")
+				local trim = string.sub(trace, if prefix then prefix + 7 else 1, string.len(trace) - 1)
 				warn(`{trim}: Attempt to require unknown module '{target}' ({typeof(target)})`)
 			end
 
@@ -367,7 +370,7 @@ function Order.LoadTasks(location: Folder)
 	dprint("Loading tasks -", location:GetFullName())
 
 	local tasksLoading = 0
-	for _: number, child: ModuleScript | Folder in location:GetChildren() do
+	for _: number, child: Instance in location:GetChildren() do
 		if child:IsA("ModuleScript") then
 			tasksLoading += 1
 			task.spawn(function()
@@ -554,7 +557,7 @@ else
 end
 
 local function IndexContext(contextRoot: Instance)
-	for _, codeGroup: Folder in contextRoot:GetChildren() do
+	for _, codeGroup: Instance in contextRoot:GetChildren() do
 		if codeGroup:IsA("Folder") and (not ActiveCodeGroups or ActiveCodeGroups[codeGroup.Name]) then
 			Order.IndexModulesOf(codeGroup)
 		end
@@ -565,7 +568,7 @@ IndexContext(SharedContext)
 Order.IndexModulesOf(PackageContext, true)
 
 local function IndexAssetModules(root: Instance)
-	for _, child: ModuleScript | Folder in root:GetChildren() do
+	for _, child: Instance in root:GetChildren() do
 		if child:IsA("ModuleScript") then
 			if AssetModules[child.Name] then
 				warn("Duplicate asset module name detected:", child.Name, "- overwriting previous module reference.")
@@ -584,12 +587,12 @@ end
 
 if RunService:IsRunning() then
 	local function loadContextTasks(context: Instance)
-		for _, codeGroup: Folder in context:GetChildren() do
+		for _, codeGroup: Instance in context:GetChildren() do
 			if ActiveCodeGroups and not ActiveCodeGroups[codeGroup.Name] then
 				continue
 			end
 
-			for _, child: Folder in codeGroup:GetChildren() do
+			for _, child: Instance in codeGroup:GetChildren() do
 				if not child:IsA("Folder") then
 					continue
 				end

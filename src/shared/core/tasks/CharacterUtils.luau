@@ -1,7 +1,7 @@
 --[[ File Info
 	CharacterUtils.luau
 	@TactBacon
-	Version: 1.7.2
+	Version: 1.7.3
 
 	Provides utility functions for working with characters.  Adds callbacks for
 	character spawning and provides a maid for cleaning up when the character is
@@ -238,15 +238,11 @@ local SpawnCallbacks = {} :: { [Player]: {} }
 --[=[
 	Get the character of a player and optionally yield until it exists
 
-	@param player Player | string -- The player to get the character of or the name of the player
+	@param player Player -- The player to get the character of
 	@param shouldYield boolean? -- Whether or not to yield until the character exists (will still return nil if the player leaves the game)
 	@return Model? -- The character of the player if it exists
 ]=]
-function CharacterUtils:GetCharacter(player: Player | string | Configuration, shouldYield: boolean?): Model?
-	if typeof(player) == "string" then
-		player = Players:FindFirstChild(player)
-	end
-
+function CharacterUtils:GetCharacter(player: Player, shouldYield: boolean?): Model?
 	if not player then
 		return
 	end
@@ -287,6 +283,8 @@ function CharacterUtils:GetLocalCharacter(shouldYield: boolean?): Model?
 				.. debug.traceback()
 		)
 	end
+
+	return nil
 end
 
 --[=[
@@ -348,19 +346,18 @@ function CharacterUtils:OnCharacterSpawned(
 	callbackName: string?,
 	priority: number?
 )
-	local playerCallbackIndex = player
 	local entry = {
 		Callback = callback,
 		Priority = priority or 0,
 		Name = callbackName,
 	}
 
-	if not SpawnCallbacks[playerCallbackIndex] then
-		SpawnCallbacks[playerCallbackIndex] = {}
+	if not SpawnCallbacks[player] then
+		SpawnCallbacks[player] = {}
 	end
 
 	if callbackName then
-		for _, otherEntry in SpawnCallbacks[playerCallbackIndex] do
+		for _, otherEntry in SpawnCallbacks[player] do
 			if otherEntry.Name == callbackName then
 				warn(
 					`Attempt to add OnCharacterSpawned for {player.Name} but callback with name {callbackName} already exists\n{debug.traceback()}`
@@ -370,8 +367,8 @@ function CharacterUtils:OnCharacterSpawned(
 		end
 	end
 
-	table.insert(SpawnCallbacks[playerCallbackIndex], entry)
-	table.sort(SpawnCallbacks[playerCallbackIndex], function(a, b)
+	table.insert(SpawnCallbacks[player], entry)
+	table.sort(SpawnCallbacks[player], function(a, b)
 		return a.Priority < b.Priority
 	end)
 
@@ -440,8 +437,7 @@ end
 	@param callbackName string -- The name of the callback to remove
 ]=]
 function CharacterUtils:RemoveOnSpawnedCallback(player: Player, callbackName: string)
-	local playerCallbackIndex = player
-	if not SpawnCallbacks[playerCallbackIndex] then
+	if not SpawnCallbacks[player] then
 		warn(
 			`Attempt to remove CharacterSpawnCallback ({callbackName}) for {player.Name} but no callbacks exist\n{debug.traceback()}`
 		)
@@ -451,9 +447,9 @@ function CharacterUtils:RemoveOnSpawnedCallback(player: Player, callbackName: st
 	local foundEntry = true
 	while foundEntry do
 		foundEntry = false
-		for i, entry in ipairs(SpawnCallbacks[playerCallbackIndex]) do
+		for i, entry in ipairs(SpawnCallbacks[player]) do
 			if entry.Name == callbackName then
-				table.remove(SpawnCallbacks[playerCallbackIndex], i)
+				table.remove(SpawnCallbacks[player], i)
 				foundEntry = true
 				break
 			end
@@ -542,7 +538,7 @@ end
 	@client
 	@return table -- The CharacterMaid for the local player
 ]=]
-function CharacterUtils:GetLocalCharacterMaid(): Maid
+function CharacterUtils:GetLocalCharacterMaid(): Maid?
 	if IS_CLIENT then
 		return self:GetCharacterMaid(LocalPlayer)
 	else
@@ -551,6 +547,8 @@ function CharacterUtils:GetLocalCharacterMaid(): Maid
 				.. debug.traceback()
 		)
 	end
+
+	return nil
 end
 
 --[=[
@@ -596,6 +594,8 @@ function CharacterUtils:GetChildFromLocalCharacter(childName: string, shouldYiel
 				.. debug.traceback()
 		)
 	end
+
+	return nil
 end
 
 --[=[
@@ -607,7 +607,7 @@ end
 	@return AnimationTrack? -- The animation track if it was successfully played
 ]=]
 function CharacterUtils:PlayAnimationOnCharacter(
-	character: Model | Player,
+	character: Model? | Player,
 	animationId: string | number,
 	animTrackOptions: AnimTrackOptions?,
 	shouldYield: boolean?
@@ -646,8 +646,8 @@ function CharacterUtils:PlayAnimationOnCharacter(
 		return
 	end
 
-	animTrackOptions = animTrackOptions or {}
-	animationId = string.match(animationId, "%d+") or animationId
+	local options: AnimTrackOptions = animTrackOptions or {}
+	animationId = string.match(tostring(animationId), "%d+") or animationId
 
 	if not animationId then
 		warn(`Cannot play animation, invalid animationId, given: {animationId}`)
@@ -668,13 +668,13 @@ function CharacterUtils:PlayAnimationOnCharacter(
 	animation.AnimationId = `rbxassetid://{animationId}`
 	local animationTrack = animator:LoadAnimation(animation)
 
-	if characterMaid and not animTrackOptions.shouldNotCache then
+	if characterMaid and not options.shouldNotCache then
 		characterMaid[`Anim.{animationId}`] = animationTrack
 	end
 
-	animationTrack:Play(animTrackOptions.fadeTime, animTrackOptions.weight, animTrackOptions.speed)
+	animationTrack:Play(options.fadeTime, options.weight, options.speed)
 
-	if animTrackOptions.shouldNotCache then
+	if options.shouldNotCache then
 		animationTrack.Ended:Once(function()
 			animationTrack:Destroy()
 		end)
@@ -714,6 +714,8 @@ function CharacterUtils:PlayAnimationOnLocalCharacter(
 				.. debug.traceback()
 		)
 	end
+
+	return nil
 end
 
 --[=[
@@ -737,14 +739,12 @@ end
 -- Initialization
 
 function CharacterUtils:Init()
-	local function onPlayerAdded(player: Player, maid)
+	local function onPlayerAdded(player: Player, playerMaid)
 		local characterMaid = CharacterUtils:GetCharacterMaid(player)
 
-		local playerCallbackIndex = player
-
 		local function onCharacterAdded(character)
-			if not SpawnCallbacks[playerCallbackIndex] then
-				SpawnCallbacks[playerCallbackIndex] = {}
+			if not SpawnCallbacks[player] then
+				SpawnCallbacks[player] = {}
 			end
 
 			CharacterChildCache[character] = {}
@@ -770,16 +770,16 @@ function CharacterUtils:Init()
 			end)
 
 			-- Automatically in priority order due to the sort on insertion
-			for _, entry in SpawnCallbacks[playerCallbackIndex] do
+			for _, entry in SpawnCallbacks[player] do
 				task.spawn(entry.Callback, character, characterMaid, player)
 			end
 		end
 
-		maid:GiveTask(player.CharacterRemoving:Connect(function(_)
+		playerMaid:GiveTask(player.CharacterRemoving:Connect(function(_)
 			characterMaid:DoCleaning()
 		end))
 
-		maid:GiveTask(player.CharacterAdded:Connect(onCharacterAdded))
+		playerMaid:GiveTask(player.CharacterAdded:Connect(onCharacterAdded))
 		if player.Character then
 			onCharacterAdded(player.Character)
 		end
@@ -788,13 +788,11 @@ function CharacterUtils:Init()
 	PlayerUtils:OnPlayerAdded(onPlayerAdded)
 
 	Players.PlayerRemoving:Connect(function(player: Player)
-		local playerCallbackIndex = player
-
 		if CharacterMaids[player] then
 			CharacterMaids[player]:DoCleaning()
 			CharacterMaids[player] = nil
 		end
-		SpawnCallbacks[playerCallbackIndex] = nil
+		SpawnCallbacks[player] = nil
 	end)
 end
 

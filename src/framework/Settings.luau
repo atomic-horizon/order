@@ -11,7 +11,7 @@ export type OrderSettings = {
 		VerboseLoading: boolean,
 	},
 	PlaceTypes: { [number]: string },
-	CodeGroups: { [string]: { [string]: boolean } },
+	CodeGroups: { [string]: { [string]: true } },
 	InitOrder: "Individual" | "Project",
 	InitFunctionConfig: { Initializer },
 	SilentMode: boolean,
