@@ -2,16 +2,16 @@
 
 	Author(s): ChiefWildin
 	Module: AtomicPane.luau
-	Version: 1.2.1
+	Version: 1.2.2
 
 ]]
 
 -- Dependencies
 
-local AnimNation = shared("AnimNation") ---@module AnimNation
-local GuiTemplates = shared("GuiTemplates") ---@module GuiTemplates
-local lerp = shared("lerp") ---@module lerp
-local Maid = shared("Maid") ---@module Maid
+local AnimNation = shared("AnimNation")
+local GuiTemplates = shared("GuiTemplates")
+local lerp = shared("lerp")
+local Maid = shared("Maid")
 
 -- Types
 
@@ -26,14 +26,18 @@ type UIElement =
 	| ViewportFrame
 	| CanvasGroup
 	| UIStroke
-export type AtomicPaneImpl = {
+export type AtomicPane = {
 	-- Metatable members
 
-	__index: AtomicPaneImpl,
+	__index: AtomicPane,
 
 	-- Public members
 
 	ClassName: string,
+	Destroying: RBXScriptSignal,
+	Gui: Frame,
+	Maid: Maid.Maid,
+	VisibleChanged: RBXScriptSignal,
 
 	new: (template: string | Instance, instanceKeys: { [string]: string }) -> AtomicPane,
 	Destroy: (self: AtomicPane) -> (),
@@ -43,39 +47,26 @@ export type AtomicPaneImpl = {
 	Show: (self: AtomicPane, doNotAnimate: boolean?) -> (),
 	Hide: (self: AtomicPane, doNotAnimate: boolean?) -> (),
 	Toggle: (self: AtomicPane, doNotAnimate: boolean?) -> (),
-	AddSpring: (self: AtomicPane, name: string, info: AnimNation.SpringInfo?) -> AnimNation.Spring,
-	AddSprings: (self: AtomicPane, springs: { string }, info: AnimNation.SpringInfo?) -> (),
+	AddSpring: (self: AtomicPane, name: string, info: AnimNation.SpringInfo) -> AnimNation.Spring,
+	AddSprings: (self: AtomicPane, springs: { string }, info: AnimNation.SpringInfo) -> (),
 	SetSpring: (self: AtomicPane, name: string, value: number, instant: boolean?) -> (),
 	SetAlphaAnimationEnabled: (self: AtomicPane, enabled: boolean) -> (),
 	MapAlpha: (self: AtomicPane, element: UIElement) -> (),
 
 	-- Private members
 
+	_alphaMap: { [UIElement]: { [string]: number } },
+	_alphaAnimationDisabled: boolean?,
+	_destroying: BindableEvent,
 	_draw: (self: AtomicPane) -> (),
 	_drawMappedAlphas: (self: AtomicPane) -> (),
+	_maid: Maid.Maid,
+	_springs: { [string]: AnimNation.Spring },
 	_update: (self: AtomicPane) -> (),
 	_useStoryControls: (self: AtomicPane) -> (),
+	_visible: boolean,
+	_visibleChanged: BindableEvent,
 }
-export type AtomicPane = typeof(setmetatable(
-	{} :: {
-		-- Constructed public members
-		Gui: Frame,
-		Maid: Maid.Maid,
-		VisibleChanged: RBXScriptSignal,
-		Destroying: RBXScriptSignal,
-
-		-- Constructed private members
-		_alphaMap: { [UIElement]: { [string]: number } },
-		_alphaAnimationDisabled: boolean?,
-		_destroyed: boolean?,
-		_destroying: BindableEvent,
-		_maid: Maid.Maid,
-		_springs: { [string]: AnimNation.Spring },
-		_visible: boolean,
-		_visibleChanged: BindableEvent,
-	},
-	{} :: AtomicPaneImpl
-))
 export type Spring = AnimNation.Spring
 
 -- Module Declaration
@@ -122,7 +113,7 @@ export type Spring = AnimNation.Spring
 	return ExamplePane
 	```
 ]=]
-local AtomicPane: AtomicPaneImpl = {} :: AtomicPaneImpl
+local AtomicPane = {}
 AtomicPane.__index = AtomicPane
 AtomicPane.ClassName = "AtomicPane"
 
@@ -153,10 +144,6 @@ end
 	Runs the specific ordering of draw functions for the AtomicPane.
 ]=]
 function AtomicPane:_update()
-	if self._destroyed then
-		return
-	end
-
 	self:_drawMappedAlphas()
 	self:_draw()
 end
@@ -268,27 +255,33 @@ end
 	`_draw` function and be available in the `_springs` table.
 
 	@param name string -- The name of the spring to add
-	@param info table -- The spring parameters to define the initial spring	values, defaults to { s = 30, d = 1, i = 0 }
+	@param info SpringInfo? -- The spring parameters to define the initial spring values
 ]=]
 function AtomicPane:AddSpring(name: string, info: AnimNation.SpringInfo?): AnimNation.Spring
-	info = info or { s = 30, d = 1, i = 0 }
+	if name == "Visible" then
+		warn(
+			`{self.ClassName} is adding a spring with the name "Visible", recommended to use "Alpha" instead to avoid accidental conflict with :SetVisible()`
+		)
+	end
+
+	local springInfo = info or { s = 30, d = 1, i = 0 }
 
 	if self._springs[name] then
-		for key, value in info do
+		for key, value in springInfo do
 			self._springs[name][key] = value
 		end
 	else
-		self._springs[name] = AnimNation.createSpring(info)
+		self._springs[name] = AnimNation.createSpring(springInfo)
 
 		-- Add spring binds cleanup to maid
 		self._maid:GiveTask(self._springs[name])
 
 		-- Bind spring update to gui update
-		task.defer(function()
-			self._springs[name]:Bind("Update", function()
-				self:_update()
-			end)
+		self._springs[name]:Bind("Update", function()
+			self:_update()
 		end)
+
+		task.defer(self._update, self)
 	end
 
 	return self._springs[name]
@@ -346,12 +339,7 @@ end
 	@param doNotAnimate boolean? -- Whether the transition is animated or instant
 ]=]
 function AtomicPane:Hide(doNotAnimate: boolean?)
-	local success, message = pcall(function()
-		self:SetVisible(false, doNotAnimate)
-	end)
-	if not success then
-		warn(`Failed to hide AtomicPane: {message}`, self)
-	end
+	self:SetVisible(false, doNotAnimate)
 end
 
 --[=[
@@ -385,11 +373,18 @@ end
 
 	@param self AtomicPane
 ]=]
-function AtomicPane.Destroy(self: any | AtomicPane)
-	self._destroyed = true
+function AtomicPane.Destroy(self: AtomicPane)
+	if not self._maid then
+		return
+	end
+
 	self._destroying:Fire()
 	-- Defer so that the signal connections can process
 	task.defer(function()
+		if not self._maid then
+			return
+		end
+
 		self._maid:Destroy()
 		self._maid = nil
 		self.Maid = nil
@@ -444,7 +439,7 @@ end
 	@private
 	A table of all of the pane's springs. Includes the Alpha spring by default.
 ]=]
-function AtomicPane.new(template: string | Instance, instanceKeys: { [string]: string }?)
+function AtomicPane.new(template: string | Instance, instanceKeys: { [string]: string }?): AtomicPane
 	assert(
 		typeof(template) == "string" or typeof(template) == "Instance",
 		"Template must be an existing instance or name of a GuiTemplate."
