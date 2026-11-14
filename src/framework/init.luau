@@ -69,7 +69,7 @@ end
 -- Initialization
 
 if RunService:IsServer() then
-	vprint(`{Order.Version} / {Order.PlaceType} / {Order.Environment}`)
+	print(`{Order.Version} / {Order.PlaceType} / {Order.Environment}`)
 end
 dprint("Framework initializing...")
 
@@ -412,7 +412,7 @@ end
 -- Initializes all currently loaded tasks. Clears the task initialization queue
 -- after all tasks have been initialized.
 function Order.InitializeTasks()
-	vprint("Initializing tasks...")
+	dprint("Initializing tasks...")
 
 	table.sort(Tasks, function(a, b)
 		local aPriority = a.Priority or 0
@@ -516,7 +516,7 @@ function Order.InitializeTasks()
 
 	table.clear(Tasks)
 
-	vprint("All tasks initialized.")
+	dprint("All tasks initialized.")
 end
 
 function Order.New(assetName: string): Instance?
