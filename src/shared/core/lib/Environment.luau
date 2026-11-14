@@ -5,7 +5,7 @@
 
 	Answers which environment this server or client runs in, from the place's
 	entry in Settings.PlaceTypes, whether it runs in Studio, and the
-	UseMockData workspace attribute.
+	UseMockData and ReadOnlyData workspace attributes.
 
 ]]
 
@@ -74,6 +74,18 @@ end
 ]=]
 function Environment.UsesMockData(): boolean
 	return workspace:GetAttribute("UseMockData") == true
+end
+
+--[=[
+	Whether saved data is loaded but never written, through the `ReadOnlyData`
+	attribute on `workspace`. Data loads from the store this place would
+	normally use, and changes made during the session are discarded, so a test
+	can start from the same saved state every time.
+
+	@return boolean
+]=]
+function Environment.UsesReadOnlyData(): boolean
+	return workspace:GetAttribute("ReadOnlyData") == true
 end
 
 return Environment

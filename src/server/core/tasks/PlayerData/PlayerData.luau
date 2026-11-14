@@ -2,7 +2,7 @@
 
 	PlayerData.lua
 	ChiefWildin
-	Version: 2.6.0
+	Version: 2.7.0
 
 	Handles the implementation of ProfileService and ReplicaService for
 	managing player data.
@@ -49,6 +49,8 @@ local PREVIOUS_SESSION_RELEASE_TIMEOUT = 15
 local STORE_NAME = if Environment.IsProduction() and not Environment.UsesMockData()
 	then "PlayerData_Prod"
 	else "PlayerData_Testing2"
+-- Loads saved data without a session lock and never writes it back
+local READ_ONLY_DATA = Environment.UsesReadOnlyData()
 
 -- Global variables
 
@@ -93,7 +95,7 @@ local function warnMissingData(player: Player, action: string, keyPath: string |
 	)
 end
 
-local function profileReleased(player: Player, profile: any)
+local function clearPlayerSession(player: Player, profile: any): ()
 	if PlayerCache[player] then
 		PlayerCache[player]:Destroy()
 	end
@@ -104,9 +106,43 @@ local function profileReleased(player: Player, profile: any)
 	if LoadedProfilesByUserId[player.UserId] == profile then
 		LoadedProfilesByUserId[player.UserId] = nil
 	end
+end
+
+local function profileReleased(player: Player, profile: any)
+	clearPlayerSession(player, profile)
 
 	-- Kick the player, just in case
 	player:Kick()
+end
+
+-- Stands in for a profile when read-only data finds nothing saved. It has the
+-- methods PlayerData calls and none of them write.
+local function createUnsavedProfile(): any
+	return {
+		Data = deepTableCopy(ProfileTemplate),
+		AddUserId = function() end,
+		Reconcile = function() end,
+		ListenToRelease = function()
+			return { Disconnect = function() end }
+		end,
+		IsActive = function()
+			return false
+		end,
+		Save = function() end,
+		Release = function() end,
+	}
+end
+
+-- ProfileService's view mode loads a profile without a session lock, and its
+-- Save and Release never write
+local function loadReadOnlyProfile(userId: number): any?
+	local viewSucceeded, profile = pcall(ProfileStore.ViewProfileAsync, ProfileStore, tostring(userId))
+	if not viewSucceeded then
+		warn(`[PlayerData] Failed to load read-only data for {userId}: {profile}`)
+		return nil
+	end
+
+	return profile or createUnsavedProfile()
 end
 
 -- A player who rejoins the same server quickly can arrive before the previous
@@ -164,7 +200,9 @@ local function processPlayer(player: Player)
 		return
 	end
 
-	local profile = ProfileStore:LoadProfileAsync(tostring(player.UserId), "ForceLoad")
+	local profile = if READ_ONLY_DATA
+		then loadReadOnlyProfile(player.UserId)
+		else ProfileStore:LoadProfileAsync(tostring(player.UserId), "ForceLoad")
 	if profile == nil then
 		failPlayerLoad(player)
 		return
@@ -492,6 +530,10 @@ end
 function PlayerData:Prep()
 	ProfileStore = ProfileService.GetProfileStore(STORE_NAME, ProfileTemplate)
 
+	if READ_ONLY_DATA then
+		warn(`[PlayerData] ReadOnlyData is on. Data loads from {STORE_NAME} and nothing is saved.`)
+	end
+
 	Players.PlayerRemoving:Connect(function(player)
 		local profile = PlayerProfiles[player]
 		if profile ~= nil then
@@ -501,7 +543,12 @@ function PlayerData:Prep()
 
 			ProfileHolds[player] = nil
 
-			profile:Release()
+			-- A read-only profile never fires its release listeners
+			if READ_ONLY_DATA then
+				clearPlayerSession(player, profile)
+			else
+				profile:Release()
+			end
 		else
 			PlayerCache[player] = nil
 		end
