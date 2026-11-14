@@ -13,9 +13,22 @@ The following instructions will get you up and running with an Order-powered exp
 2. Select the proper owner, add a name, choose your desired visiblity options, and click "Create repository from template"
 3. Using the software of your choice (I typically use VS Code's Source Control menu), clone your new repository to your computer
 
-## 3) Initialize Wally
-1. If you don't yet have Wally, you can install it [from here.](https://github.com/UpliftGames/wally)
-2. Open a terminal in your new project's directory and run the command `wally install` to get the included packages.
+## 3) Install packages with Forest (recommended)
+1. Install [Rokit](https://github.com/rojo-rbx/rokit), then run `rokit install` in your new project's directory. This installs Rojo, StyLua and the [Forest](https://docs.forest.dev/) CLI at the versions in `rokit.toml`.
+2. Run `forest install`. Forest reads `forest.json` and installs shared packages into `Packages` and server-only packages into `ServerPackages`.
+3. Commit the generated `forest-lock.json` so every machine installs the same versions.
+
+<details>
+<summary>Using Wally instead</summary>
+
+Wally is still supported, but Forest is recommended for new projects.
+
+1. If you don't yet have Wally, you can install it [from here](https://github.com/UpliftGames/wally) or through Rokit or Aftman, which both list it.
+2. Run `wally install` in your project's directory to get the packages in `wally.toml`.
+
+Only use one package manager per project: Forest removes Wally's `_Index` folders the next time it installs. `forest init --project` can convert an existing `wally.toml` into a `forest.json`.
+
+</details>
 
 ## 4) Project configuration
 1. Open the new repository in VS Code and then open the `default.project.json` file

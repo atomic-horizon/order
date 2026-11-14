@@ -579,8 +579,9 @@ end
 IndexContext(LocalContext)
 IndexContext(SharedContext)
 Order.IndexModulesOf(PackageContext, true)
--- Wally's server-only dependencies, when the project maps them into
--- ServerScriptService.ServerPackages. That folder never replicates.
+-- Server-only packages (Forest's ServerPackages mount or Wally's server
+-- dependencies), mapped into ServerScriptService.ServerPackages. That folder
+-- never replicates.
 if RunService:IsServer() then
 	local ServerPackageContext = game:GetService("ServerScriptService"):FindFirstChild("ServerPackages")
 	if ServerPackageContext then

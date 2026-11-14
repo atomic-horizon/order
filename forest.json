@@ -1,0 +1,46 @@
+{
+  "dependencies": {
+    "1foreverhd/topbarplus": {
+      "alias": "TopbarPlus",
+      "version": "^3.4.0"
+    },
+    "chiefwildin/AnimNation": {
+      "alias": "AnimNation",
+      "version": "^1.14.0"
+    },
+    "gamebeast/RobloxSDK": {
+      "alias": "GamebeastSDK",
+      "version": "^1.0.0"
+    },
+    "sleitnick/component": {
+      "alias": "Component",
+      "version": "^2.4.8"
+    },
+    "sleitnick/signal": {
+      "alias": "Signal",
+      "version": "^2.0.3"
+    },
+    "sleitnick/trove": {
+      "alias": "Trove",
+      "version": "^1.8.0"
+    }
+  },
+  "mounts": {
+    "ServerPackages": {
+      "dependencies": {
+        "evaera/cmdr": {
+          "alias": "Cmdr",
+          "version": "^1.13.0"
+        },
+        "lm-loleris/profilestore": {
+          "alias": "ProfileStore",
+          "version": "^1.0.3"
+        }
+      }
+    }
+  },
+  "name": "order",
+  "platform": "roblox",
+  "root": "/",
+  "version": "3.1.0"
+}
