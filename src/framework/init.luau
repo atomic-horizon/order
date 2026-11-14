@@ -69,11 +69,9 @@ end
 -- Initialization
 
 if RunService:IsServer() then
-	vprint("Version:", Order.Version)
-	vprint("PlaceType:", Order.PlaceType)
-	vprint("Environment:", Order.Environment)
+	vprint(`{Order.Version} / {Order.PlaceType} / {Order.Environment}`)
 end
-vprint("Framework initializing...")
+dprint("Framework initializing...")
 
 -- The current number of ancestry levels that have been indexed
 local AncestorLevelsExpanded = 0
@@ -639,7 +637,7 @@ end
 Order._initialized = true
 shared._OrderInitialized = true
 
-vprint("Framework initialized.")
+dprint("Framework initialized.")
 
 if Settings.Debug.CyclicAnalysis then
 	table.sort(CyclesFound)
