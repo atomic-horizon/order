@@ -1,7 +1,7 @@
 --[[ File Info
 
 	Module: Environment.luau
-	Version: 1.0.0
+	Version: 1.1.0
 
 	Answers which environment this server or client runs in, from the place's
 	entry in Settings.PlaceTypes, whether it runs in Studio, and the
@@ -33,6 +33,31 @@ export type EnvironmentName = "Production" | "Testing"
 -- Module Declaration
 
 local Environment = {}
+
+-- Global Variables
+
+local WarnedIgnoredAttributes: { [string]: boolean } = {}
+
+-- Private Functions
+
+-- Testing attributes only apply outside live production servers, so a place
+-- file published with one left on cannot affect real player data
+local function readTestingAttribute(attributeName: string): boolean
+	if workspace:GetAttribute(attributeName) ~= true then
+		return false
+	end
+
+	if Environment.IsProduction() then
+		if not WarnedIgnoredAttributes[attributeName] then
+			WarnedIgnoredAttributes[attributeName] = true
+			warn(`[Environment] {attributeName} is ignored in production servers`)
+		end
+
+		return false
+	end
+
+	return true
+end
 
 -- Public Functions
 
@@ -69,23 +94,25 @@ end
 --[=[
 	Whether data stores are replaced with in-memory mocks, through the
 	`UseMockData` attribute on `workspace`. Nothing is saved while this is on.
+	Always false in live production servers.
 
 	@return boolean
 ]=]
 function Environment.UsesMockData(): boolean
-	return workspace:GetAttribute("UseMockData") == true
+	return readTestingAttribute("UseMockData")
 end
 
 --[=[
 	Whether saved data is loaded but never written, through the `ReadOnlyData`
 	attribute on `workspace`. Data loads from the store this place would
 	normally use, and changes made during the session are discarded, so a test
-	can start from the same saved state every time.
+	can start from the same saved state every time. Always false in live
+	production servers.
 
 	@return boolean
 ]=]
 function Environment.UsesReadOnlyData(): boolean
-	return workspace:GetAttribute("ReadOnlyData") == true
+	return readTestingAttribute("ReadOnlyData")
 end
 
 return Environment
