@@ -2,7 +2,7 @@
 
 	Author: ChiefWildin
 	Module: CacheService.lua
-	Version: 1.3.0
+	Version: 1.4.0
 
 ]]
 
@@ -18,24 +18,38 @@ local CacheService = {}
 
 -- Types
 
+type CacheEntry = {
+	Data: any,
+	EntryTime: number,
+	Cleanup: (() -> ())?,
+}
+
+--[=[
+	@type AddCallback () -> (any?, (() -> ())?)
+	@within CacheService
+
+	Produces a value to cache. It may return a cleanup function as a second
+	value, which runs once when the entry leaves the cache.
+]=]
+export type AddCallback = () -> (any?, (() -> ())?)
+
 --[=[
 	@interface Cache
 	@within CacheService
 
 	.EntryLimit number -- Maximum number of entries the cache will hold
 	.EntryAgeLimit number -- Number of seconds entries are allowed to exist
-	.Entries {[string]: {Data: any, EntryTime: number}} -- The cached entries
+	.Entries {[any]: {Data: any, EntryTime: number, Cleanup: (() -> ())?}} -- The cached entries
 ]=]
 export type Cache = {
 	EntryLimit: number,
 	EntryAgeLimit: number,
-	Entries: { [string]: {
-		Data: any,
-		EntryTime: number,
-	} },
-	Get: (self: Cache, index: string) -> any?,
-	GetOrAdd: (self: Cache, index: string, addCallback: () -> any?) -> any?,
-	Set: (self: Cache, index: string, data: any) -> (),
+	Entries: { [any]: CacheEntry },
+	Get: (self: Cache, index: any) -> any?,
+	GetOrAdd: (self: Cache, index: any, addCallback: AddCallback) -> any?,
+	Set: (self: Cache, index: any, data: any, cleanup: (() -> ())?) -> (),
+	Remove: (self: Cache, index: any) -> (),
+	_pendingLoads: { [any]: { thread } },
 }
 
 -- Variables
@@ -61,6 +75,16 @@ local function vprint(...)
 	end
 end
 
+local function cleanUpEntry(entry: CacheEntry?)
+	if entry and entry.Cleanup then
+		task.spawn(entry.Cleanup)
+	end
+end
+
+local function isExpired(cache: Cache, entry: CacheEntry): boolean
+	return CLOCK() - entry.EntryTime > cache.EntryAgeLimit
+end
+
 -- API Functions
 
 --[=[
@@ -82,6 +106,7 @@ function Cache.new(name: string, entryLimit: number?, entryAgeLimit: number?): C
 		self.EntryLimit = entryLimit or DEFAULT_CACHE_ENTRY_LIMIT
 		self.EntryAgeLimit = entryAgeLimit or DEFAULT_ENTRY_AGE_LIMIT
 		self.Entries = {}
+		self._pendingLoads = {}
 	else
 		self.EntryLimit = entryLimit or self.EntryLimit
 		self.EntryAgeLimit = entryAgeLimit or self.EntryAgeLimit
@@ -94,57 +119,124 @@ end
 	Returns the cached value at the given index, or `nil` if the entry is
 	missing or expired.
 
-	@param index string -- The cache key to look up
+	@param index any -- The cache key to look up
 	@return any? -- The cached value, or nil if missing or expired
 ]=]
-function Cache:Get(index: string): any?
-	if not index then
+function Cache:Get(index: any): any?
+	if index == nil then
 		return nil
 	end
 
-	if not self.Entries[index] or self.Entries[index].EntryTime + self.EntryAgeLimit < CLOCK() then
+	local entry = self.Entries[index]
+	if not entry then
+		return nil
+	end
+
+	if isExpired(self, entry) then
 		vprint(`[CacheService] Requested data entry ({index}) is expired. Removing.`)
-		self.Entries[index] = nil
+		self:Remove(index)
 		return nil
 	end
 
-	return self.Entries[index].Data
+	return entry.Data
 end
 
 --[=[
 	Returns the cached value at the given index. If it is missing or expired,
 	calls `addCallback` to produce a value, caches it, and returns it.
 
-	@param index string -- The cache key to look up
-	@param addCallback function -- Called to produce the value if not cached
-	@return any? -- The cached or newly produced value
-]=]
-function Cache:GetOrAdd(index: string, addCallback: () -> any?): any?
-	local data = self:Get(index)
+	Only one `addCallback` runs per index at a time. Callers that arrive while
+	a value is being produced wait for that result instead of producing their
+	own. If `addCallback` errors, every waiting caller receives the error and
+	nothing is cached.
 
-	if not data then
-		data = addCallback()
-		self:Set(index, data)
+	`addCallback` may return a cleanup function as a second value, which runs
+	once when the entry is removed, replaced, or expires.
+
+	@param index any -- The cache key to look up
+	@param addCallback AddCallback -- Called to produce the value if not cached
+	@return any? -- The cached or newly produced value
+	@yields
+]=]
+function Cache:GetOrAdd(index: any, addCallback: AddCallback): any?
+	local data = self:Get(index)
+	if data ~= nil then
+		return data
 	end
 
-	return data
+	local waitingThreads = self._pendingLoads[index]
+	if waitingThreads then
+		table.insert(waitingThreads, coroutine.running())
+
+		local loadSucceeded, loadResult = coroutine.yield()
+		if not loadSucceeded then
+			error(loadResult, 0)
+		end
+
+		return loadResult
+	end
+
+	waitingThreads = {}
+	self._pendingLoads[index] = waitingThreads
+
+	local loadSucceeded, loadResult, cleanup = pcall(addCallback)
+	self._pendingLoads[index] = nil
+
+	if loadSucceeded and loadResult ~= nil then
+		self:Set(index, loadResult, if typeof(cleanup) == "function" then cleanup else nil)
+	end
+
+	for _, waitingThread in waitingThreads do
+		task.spawn(waitingThread, loadSucceeded, loadResult)
+	end
+
+	if not loadSucceeded then
+		error(loadResult, 0)
+	end
+
+	return loadResult
 end
 
 --[=[
-	Stores the given value at the specified index.
+	Stores the given value at the specified index. Any entry it replaces is
+	cleaned up.
 
-	@param index string -- The cache key to store the value under
+	@param index any -- The cache key to store the value under
 	@param data any -- The value to cache
+	@param cleanup (() -> ())? -- Runs once when this entry leaves the cache
 ]=]
-function Cache:Set(index: string, data: any)
-	if not index then
+function Cache:Set(index: any, data: any, cleanup: (() -> ())?)
+	if index == nil then
 		return
 	end
+
+	local previousEntry = self.Entries[index]
 
 	self.Entries[index] = {
 		Data = data,
 		EntryTime = CLOCK(),
+		Cleanup = cleanup,
 	}
+
+	if previousEntry and previousEntry.Cleanup ~= cleanup then
+		cleanUpEntry(previousEntry)
+	end
+end
+
+--[=[
+	Removes the entry at the given index and runs its cleanup, if any.
+
+	@param index any -- The cache key to remove
+]=]
+function Cache:Remove(index: any)
+	if index == nil then
+		return
+	end
+
+	local entry = self.Entries[index]
+	self.Entries[index] = nil
+
+	cleanUpEntry(entry)
 end
 
 --[=[
@@ -169,48 +261,66 @@ end
 	Stores a value at the given index in the named cache.
 
 	@param cacheName string -- The name of the cache
-	@param index string -- The cache key
+	@param index any -- The cache key
 	@param data any -- The value to cache
+	@param cleanup (() -> ())? -- Runs once when this entry leaves the cache
 ]=]
-function CacheService:Set(cacheName: string, index: string, data: any)
-	Cache.new(cacheName):Set(index, data)
+function CacheService:Set(cacheName: string, index: any, data: any, cleanup: (() -> ())?)
+	CacheService:CreateCache(cacheName):Set(index, data, cleanup)
 end
 
 --[=[
 	Returns the cached value at the given index, or `nil` if missing or expired.
 
 	@param cacheName string -- The name of the cache
-	@param index string -- The cache key to look up
+	@param index any -- The cache key to look up
 	@return any?
 ]=]
-function CacheService:Get(cacheName: string, index: string)
-	return Cache.new(cacheName):Get(index)
+function CacheService:Get(cacheName: string, index: any)
+	return CacheService:CreateCache(cacheName):Get(index)
 end
 
 --[=[
 	Returns the cached value at the given index. If missing or expired, calls
-	`addCallback` to produce a value, caches it, and returns it.
+	`addCallback` to produce a value, caches it, and returns it. See
+	[Cache:GetOrAdd] for details.
 
 	@param cacheName string -- The name of the cache
-	@param index string -- The cache key to look up
-	@param addCallback function -- Called to produce the value if not cached
+	@param index any -- The cache key to look up
+	@param addCallback AddCallback -- Called to produce the value if not cached
 	@return any?
+	@yields
 ]=]
-function CacheService:GetOrAdd(cacheName: string, index: string, addCallback: () -> any?): any?
-	return Cache.new(cacheName):GetOrAdd(index, addCallback)
+function CacheService:GetOrAdd(cacheName: string, index: any, addCallback: AddCallback): any?
+	return CacheService:CreateCache(cacheName):GetOrAdd(index, addCallback)
+end
+
+--[=[
+	Removes a value from the named cache right away and runs its cleanup.
+	Values are also removed automatically when they expire or when the cache
+	exceeds its entry limit.
+
+	@param cacheName string -- The name of the cache
+	@param index any -- The cache key to remove
+]=]
+function CacheService:Remove(cacheName: string, index: any)
+	local cache = Caches[cacheName]
+	if cache then
+		cache:Remove(index)
+	end
 end
 
 -- Cache clearing to prevent memory leakage
 task.spawn(function()
 	while task.wait(LIMIT_CHECK_INTERVAL) do
 		vprint("[CacheService] Validating caches")
-		for cacheName: string, cache: Cache in pairs(Caches) do
+		for cacheName: string, cache: Cache in Caches do
 			local cacheSize = 0
 
-			for entryName, data in pairs(cache.Entries) do
-				if CLOCK() - data.EntryTime > cache.EntryAgeLimit then
+			for entryName, entry in cache.Entries do
+				if isExpired(cache, entry) then
 					vprint(`[CacheService] Cached data entry ({entryName}) in cache {cacheName} is expired. Removing.`)
-					cache.Entries[entryName] = nil
+					cache:Remove(entryName)
 				else
 					cacheSize += 1
 				end
@@ -220,7 +330,13 @@ task.spawn(function()
 				vprint(
 					`[CacheService] Number of cached entries exceeded limit ({cache.EntryLimit}) in cache {cacheName}, clearing.`
 				)
-				Caches[cacheName].Entries = {}
+
+				local clearedEntries = cache.Entries
+				cache.Entries = {}
+
+				for _, clearedEntry in clearedEntries do
+					cleanUpEntry(clearedEntry)
+				end
 			end
 		end
 	end

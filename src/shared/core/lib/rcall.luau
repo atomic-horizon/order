@@ -2,7 +2,7 @@
 
 	Authors: ChiefWildin
 	Module: rcall.luau
-	Version: 1.4.0
+	Version: 1.5.0
 
 	Retrying call. Provides a way to call functions with a retry limit and
 	delay to protect against calls that fail occasionally, such as web API
@@ -23,11 +23,13 @@ type rcallOptions = {
 	silent: boolean?,
 	traceback: boolean?,
 	backoff: boolean?,
+	jitter: boolean?,
 }
 
 -- Constants
 
-local BASE_DELAY_OFFSET = 1
+-- The longest a backoff delay can grow to, in seconds
+local MAX_BACKOFF_DELAY = 60
 -- Whether we should force rcall to print a stack trace for debugging
 local FORCE_TRACEBACK = false
 
@@ -67,12 +69,15 @@ local function MainLoop(params: rcallOptions, callback: (...any) -> ...any, ...:
 				return nil
 			end
 
-			local actualDelay = math.max(
-				if params.backoff
-					then ((retryDelay + BASE_DELAY_OFFSET) ^ (math.max(retries * 0.5, 1))) - BASE_DELAY_OFFSET
-					else retryDelay,
-				retryDelay
-			)
+			-- Backoff doubles the delay after each failure, up to a cap
+			local actualDelay = if params.backoff
+				then math.min(retryDelay * 2 ^ (retries - 1), math.max(MAX_BACKOFF_DELAY, retryDelay))
+				else retryDelay
+			if params.jitter then
+				-- Somewhere in the upper half of the delay, so callers that
+				-- failed together do not all retry together
+				actualDelay *= 0.5 + math.random() * 0.5
+			end
 			task.wait(actualDelay)
 		else
 			return table.unpack(callResults)
@@ -101,7 +106,8 @@ end
 	    requireResult: boolean, -- Whether the callback must return a result to be considered successful. Defaults to false.
 		silent: boolean, -- Whether the error warning should be silent. Defaults to false.
 	    traceback: boolean, -- Whether the error warning should include a traceback. Defaults to false.
-		backoff: boolean, -- Whether to use exponential backoff for retry delays. Defaults to false.
+		backoff: boolean, -- Whether to double the retry delay after each failure, up to 60 seconds. Defaults to false.
+		jitter: boolean, -- Whether to randomize each retry delay to between half and all of itself. Defaults to false.
 	}
 	```
 

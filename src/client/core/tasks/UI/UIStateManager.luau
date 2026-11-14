@@ -2,7 +2,7 @@
 
 	File: UIStateManager.lua
 	Author(s): Refactor
-	Version: 1.0.0-atomicui
+	Version: 1.1.0-atomicui
 
 	https://github.com/rfct0r/UIStateManager
 
@@ -33,8 +33,8 @@ local UIStateManager = { Priority = 9999 }
 	@interface StateProperties
 	@within UIStateManager
 
-	.Hides {string}? -- Component names to hide when this state is active. Use `"*"` to hide all.
-	.Shows {string}? -- Component names to show when this state is active. Use `"*"` to show all.
+	.Hides {string}? -- Component names to hide when this state is active. Use `"*"` to hide all, or `"Prefix_*"` for every component starting with `Prefix_`.
+	.Shows {string}? -- Component names to show when this state is active. Use `"*"` to show all, or `"Prefix_*"` for every component starting with `Prefix_`.
 	.CoreGui {Shows: {string}?, Hides: {string}?}? -- CoreGui elements to show or hide
 	.Blocks {string}? -- State names that cannot be transitioned to from this state. Use `"*"` to block all.
 	.GamepadCursorEnabled boolean? -- Whether the gamepad cursor should be enabled in this state
@@ -78,9 +78,39 @@ local EventHooks = {
 local function runHook(hookName: string, newState: string, oldState: string?): ()
 	if EventHooks[hookName] then
 		for _, hook in EventHooks[hookName] do
-			hook(newState, oldState)
+			-- Contained so one failing hook cannot leave the UI half applied or
+			-- stop the hooks after it from running
+			local success, message = pcall(hook, newState, oldState)
+			if not success then
+				warn(`[UIStateManager] {hookName} hook error: {message}`)
+			end
 		end
 	end
+end
+
+-- Whether a component name matches a Shows/Hides entry. An entry ending in
+-- "_*" matches every component whose name starts with the text before the "*".
+local function matchesComponentPattern(name: string, pattern: string): boolean
+	if pattern == "*" or pattern == name then
+		return true
+	end
+
+	if string.sub(pattern, -2) == "_*" then
+		local prefix = string.sub(pattern, 1, -2)
+		return string.sub(name, 1, #prefix) == prefix
+	end
+
+	return false
+end
+
+local function matchesAnyComponentPattern(name: string, patterns: { string }): boolean
+	for _, pattern in patterns do
+		if matchesComponentPattern(name, pattern) then
+			return true
+		end
+	end
+
+	return false
 end
 
 local function hideComponents(state: string, uiState: { [string]: any }): ()
@@ -89,7 +119,7 @@ local function hideComponents(state: string, uiState: { [string]: any }): ()
 
 	if table.find(toHide, "*") then
 		for name, component in Components do
-			if name == state or table.find(toShow, name) ~= nil then
+			if name == state or matchesAnyComponentPattern(name, toShow) then
 				continue
 			end
 			task.spawn(component.Hide, component)
@@ -106,10 +136,8 @@ local function hideComponents(state: string, uiState: { [string]: any }): ()
 			if isComponentGroup then
 				-- support for component groups (ex: HUD_BottomBar)
 				for id, component in Components do
-					if id:find(name:sub(1, -1)) then
-						task.spawn(function()
-							component:Hide()
-						end)
+					if matchesComponentPattern(id, name) and not matchesAnyComponentPattern(id, toShow) then
+						task.spawn(component.Hide, component)
 					end
 				end
 			else
@@ -147,7 +175,7 @@ local function showComponents(state: string, uiState: { [string]: any }): ()
 			if isComponentGroup then
 				-- support for component groups (ex: HUD_BottomBar)
 				for id, component in Components do
-					if id:find(name:sub(1, -1)) then
+					if matchesComponentPattern(id, name) then
 						task.spawn(component.Show, component)
 					end
 				end

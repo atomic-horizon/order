@@ -2,7 +2,7 @@
 
 	Author(s): ChiefWildin
 	Module: ProcessQueue.luau
-	Version: 1.1.0
+	Version: 1.2.0
 
 ]]
 
@@ -64,6 +64,26 @@ end
 function ProcessQueue:Add(item: any)
 	table.insert(self._queue, item)
 	self:_processQueue()
+end
+
+--[=[
+	Removes every waiting occurrence of an item from the queue. An item that is
+	already being processed is not affected.
+
+	@param item any -- The item to remove from the queue.
+	@return number -- How many occurrences were removed.
+]=]
+function ProcessQueue:Remove(item: any): number
+	local removedCount = 0
+
+	for index = #self._queue, 1, -1 do
+		if self._queue[index] == item then
+			table.remove(self._queue, index)
+			removedCount += 1
+		end
+	end
+
+	return removedCount
 end
 
 --[=[

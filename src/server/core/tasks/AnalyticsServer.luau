@@ -1,7 +1,7 @@
 --[[
 	AnalyticsServer.luau
 	ChiefWildin
-    Version: 1.2.0
+    Version: 1.3.0
 ]]
 
 -- Services
@@ -14,13 +14,13 @@ local Players = game:GetService("Players")
 
 local GamebeastSDK = shared("GamebeastSDK") ---@module GamebeastSDK
 
-local GamebeastMarkers = GamebeastSDK:GetService("Markers")
-
 -- Main job table
 
 local AnalyticsServer = {}
 
 -- Constants
+
+local GAMEBEAST_ENABLED_ATTRIBUTE = "GamebeastEnabled"
 
 -- Global Variables
 
@@ -46,6 +46,9 @@ function AnalyticsServer:Prep()
 	else
 		print("[AnalyticsServer]: Gamebeast API secret not found. Gamebeast analytics will be disabled.")
 	end
+
+	-- Clients only start their SDK when the server's is running
+	workspace:SetAttribute(GAMEBEAST_ENABLED_ATTRIBUTE, fetchSuccess)
 
 	local function setupPlayer(player: Player)
 		if player:IsA("Configuration") then

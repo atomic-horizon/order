@@ -1,6 +1,16 @@
 {
 	"name": "New Order Project",
 	"emitLegacyScripts": false,
+	"globIgnorePaths": [
+		"Packages/**/*.server.lua",
+		"Packages/**/*.server.luau",
+		"Packages/**/*.client.lua",
+		"Packages/**/*.client.luau",
+		"ServerPackages/**/*.server.lua",
+		"ServerPackages/**/*.server.luau",
+		"ServerPackages/**/*.client.lua",
+		"ServerPackages/**/*.client.luau"
+	],
 	"tree": {
 		"$className": "DataModel",
 		"ReplicatedStorage": {
@@ -36,6 +46,9 @@
 			"$className": "ServerScriptService",
 			"Server": {
 				"$path": "src/server"
+			},
+			"ServerPackages": {
+				"$path": "ServerPackages"
 			}
 		},
 		"StarterPlayer": {

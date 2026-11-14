@@ -21,9 +21,15 @@ local Settings = require(script:WaitForChild("Settings")) ---@module Settings
 
 -- Setup
 
+local PlaceTypeEntry = Settings.PlaceTypes[game.PlaceId]
+local PlaceTypeConfig: Settings.PlaceTypeEntry = if typeof(PlaceTypeEntry) == "table"
+	then PlaceTypeEntry
+	else { Type = PlaceTypeEntry or "Generic" }
+
 local Order = {
-	PlaceType = Settings.PlaceTypes[game.PlaceId] or "Generic",
-	Version = "3.0.1",
+	PlaceType = PlaceTypeConfig.Type,
+	Environment = PlaceTypeConfig.Environment or "Production",
+	Version = "3.1.0",
 }
 
 type Initializer = Settings.Initializer
@@ -63,10 +69,9 @@ end
 -- Initialization
 
 if RunService:IsServer() then
-	vprint("Version:", Order.Version)
-	vprint("PlaceType:", Order.PlaceType)
+	print(`{Order.Version} / {Order.PlaceType} / {Order.Environment}`)
 end
-vprint("Framework initializing...")
+dprint("Framework initializing...")
 
 -- The current number of ancestry levels that have been indexed
 local AncestorLevelsExpanded = 0
@@ -407,7 +412,7 @@ end
 -- Initializes all currently loaded tasks. Clears the task initialization queue
 -- after all tasks have been initialized.
 function Order.InitializeTasks()
-	vprint("Initializing tasks...")
+	dprint("Initializing tasks...")
 
 	table.sort(Tasks, function(a, b)
 		local aPriority = a.Priority or 0
@@ -511,7 +516,7 @@ function Order.InitializeTasks()
 
 	table.clear(Tasks)
 
-	vprint("All tasks initialized.")
+	dprint("All tasks initialized.")
 end
 
 function Order.New(assetName: string): Instance?
@@ -534,6 +539,12 @@ end
 shared.Assets = ReplicatedStorage:WaitForChild("Assets", 999)
 shared.new = Order.New
 shared.PlaceType = Order.PlaceType
+-- The environment set for this place in Settings.PlaceTypes. Use the
+-- Environment library to account for Studio and mock data as well.
+shared.Environment = Order.Environment
+-- The code groups loaded in this place, or nil when every group is loaded. Lets
+-- code check whether a system is present instead of checking place types.
+shared.CodeGroups = ActiveCodeGroups
 
 -- Enables shared keyword to act as require()
 setmetatable(shared, Order)
@@ -566,6 +577,17 @@ end
 IndexContext(LocalContext)
 IndexContext(SharedContext)
 Order.IndexModulesOf(PackageContext, true)
+-- Server-only packages (Forest's ServerPackages mount or Wally's server
+-- dependencies), mapped into ServerScriptService or ServerStorage. Neither
+-- replicates to clients.
+if RunService:IsServer() then
+	for _, serverPackageParent in { game:GetService("ServerScriptService"), game:GetService("ServerStorage") } do
+		local serverPackageContext = serverPackageParent:FindFirstChild("ServerPackages")
+		if serverPackageContext then
+			Order.IndexModulesOf(serverPackageContext, true)
+		end
+	end
+end
 
 local function IndexAssetModules(root: Instance)
 	for _, child: Instance in root:GetChildren() do
@@ -615,7 +637,7 @@ end
 Order._initialized = true
 shared._OrderInitialized = true
 
-vprint("Framework initialized.")
+dprint("Framework initialized.")
 
 if Settings.Debug.CyclicAnalysis then
 	table.sort(CyclesFound)
