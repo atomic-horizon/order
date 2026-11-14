@@ -1,0 +1,23 @@
+{
+	"fetchedAt": "2026-11-14T18:12:16.550Z",
+	"games": [
+		{
+			"placeId": 15694891095,
+			"universeId": 5421899973,
+			"name": "Combat Arena",
+			"url": "https://www.roblox.com/games/15694891095",
+			"icon": "/img/showcase/5421899973.png",
+			"visits": 397452290,
+			"favorites": 14290528
+		},
+		{
+			"placeId": 95047916580305,
+			"universeId": 8292068736,
+			"name": "The Block",
+			"url": "https://www.roblox.com/games/95047916580305",
+			"icon": "/img/showcase/8292068736.png",
+			"visits": 154488452,
+			"favorites": 429832
+		}
+	]
+}

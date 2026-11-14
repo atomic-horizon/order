@@ -33,8 +33,9 @@ MyRemote:FireClientList({ player1, player2 }, "Hello!")
 -- Fire to all players
 MyRemote:FireAllClients("Hello, everyone!")
 
--- Fire to all players except one
+-- Fire to all players except one, or except a list of players
 MyRemote:FireAllExcept(player, "Everyone but you!")
+MyRemote:FireAllExcept({ player1, player2 }, "Everyone but you two!")
 ```
 
 ### Client → Server
@@ -71,6 +72,14 @@ end)
 
 `OnServerEvent` and `OnClientEvent` are aliases for `:OnEvent()` and can be used for clarity.
 
+`:OnEvent()` returns a connection. Disconnect it, or give it to a `Maid`, when the listener should stop before the session ends:
+
+```lua
+self.Maid:GiveTask(MyRemote:OnEvent(function(message)
+    print(message)
+end))
+```
+
 ### Rate limiting
 
 Pass a `rateLimitInterval` (in seconds) as the second argument to avoid processing bursts of events. Only the latest arguments received within the interval will be processed:
@@ -85,6 +94,17 @@ end, 0.1)
 :::caution
 Rate limiting drops intermediate events — only the most recent arguments within the interval are kept. Avoid this for events where every individual fire must be processed.
 :::
+
+By default, each player shares one rate limit for the callback. To limit separate streams independently, pass a function as the third argument that returns a key for each event. Events with different keys are limited separately:
+
+```lua
+-- Each unit a player controls is limited on its own
+MyRemote:OnEvent(function(player, unitId, position)
+    moveUnit(player, unitId, position)
+end, 0.1, function(player, unitId)
+    return unitId
+end)
+```
 
 ---
 
@@ -204,4 +224,17 @@ local MyRemote = GetRemote("MyFeature")
 
 -- myFeature.client.luau
 local MyRemote = GetRemote("MyFeature") -- same underlying remote
+```
+
+---
+
+## Destroying a remote
+
+`:Destroy()` disconnects every listener, removes the remote instances on the server, and turns the remote's methods into no-ops. Use it for remotes created for something temporary, such as a single round:
+
+```lua
+local RoundRemote = GetRemote(`Round:{roundId}`)
+
+-- When the round ends
+RoundRemote:Destroy()
 ```

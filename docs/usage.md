@@ -15,8 +15,54 @@ The framework settings module (located at `src/framework/Settings.luau`) has a f
 | `SilentMode` | When `true`, suppresses all regular output (version info, initialization notices, etc.). Warnings are never suppressed. Defaults to `false` in Studio and `true` in production. |
 | `InitOrder` | `"Project"` runs each initializer across all tasks before moving to the next. `"Individual"` runs all initializers on each task before moving to the next task. Both modes respect priority values. |
 | `InitFunctionConfig` | A table defining the initialization functions for the project and their options (name, async, protected, warn delay). |
-| `PlaceTypes` | Maps Place IDs to named place type strings. Unrecognized places default to `"Generic"`. The active type is accessible at runtime via `shared.PlaceType`. |
+| `PlaceTypes` | Maps Place IDs to a place type string, or to a table that also sets the place's environment (see [Environments](#environments)). Unrecognized places default to `"Generic"`. The active type is accessible at runtime via `shared.PlaceType`. |
 | `CodeGroups` | Maps place type names to the set of code group root directories that should be active for that type. Enables selectively sharing modules across different server types (e.g. lobby vs. game server). |
+
+## Environments
+Each place runs in either the `"Production"` or `"Testing"` environment. Set it with the table form of a `PlaceTypes` entry:
+
+```lua
+PlaceTypes = {
+    [123456789] = "Lobby", -- Production
+    [987654321] = { Type = "Lobby", Environment = "Testing" },
+},
+```
+
+Places with no environment, and places that aren't listed, are `"Production"`. The configured value is available as `shared.Environment`. Use the `Environment` library to also account for Studio:
+
+```lua
+local Environment = shared("Environment")
+
+if Environment.IsProduction() then
+    -- A live server of a production place
+end
+```
+
+| Function | Returns |
+| --- | --- |
+| `Environment.GetName()` | The environment set in `PlaceTypes`. |
+| `Environment.IsProduction()` | `true` in live servers of production places. `false` in Studio and testing places. |
+| `Environment.IsTesting()` | The opposite of `IsProduction()`. |
+| `Environment.UsesMockData()` | Whether the `UseMockData` attribute is on (see [Player Data](player-data#data-stores-and-testing)). |
+| `Environment.UsesReadOnlyData()` | Whether the `ReadOnlyData` attribute is on (see [Player Data](player-data#data-stores-and-testing)). |
+
+`PlayerData` uses the environment to pick its data store. See [Player Data](player-data#data-stores-and-testing) for the stores and the testing attributes.
+
+## Packages
+Packages install into two folders:
+
+- `Packages` maps to `ReplicatedStorage.Packages` and is available on both the server and the client.
+- `ServerPackages` maps to `ServerScriptService.ServerPackages` and is never replicated, so clients can't see its source. Cmdr and ProfileStore install here.
+
+Order indexes both folders, so packages load by their alias like any other module:
+
+```lua
+local ProfileStore = shared("ProfileStore")
+```
+
+:::note
+`default.project.json` skips `.server` and `.client` scripts inside both package folders. Some packages ship test scripts, and Rojo gives them a `RunContext`, which makes them run wherever they are placed.
+:::
 
 ## File structure
 

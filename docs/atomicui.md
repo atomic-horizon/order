@@ -79,6 +79,19 @@ function MyPane.new(parent: Instance)
 end
 ```
 
+`MapAlpha` caches each element's current transparencies as its fully visible values, so map elements while they look the way they should when visible. Mapped values are drawn at the pane's current alpha as soon as they are mapped.
+
+Pass a list of instances as the second argument to skip their subtrees, for example nested components that animate their own transparency:
+
+```lua
+self:MapAlpha(self.Gui, { self.LoadingSpinner })
+```
+
+To change mapping after the fact:
+
+- `UnmapAlpha(element)` stops driving an element and its descendants, and leaves their transparencies as they are.
+- `SetMappedAlpha(element, property, visibleAlpha)` changes the value one property shows when the pane is fully visible, for elements whose resting look changes after they were mapped.
+
 ### Custom springs
 
 Add extra springs for animations beyond visibility:
@@ -146,7 +159,7 @@ return MyButton
 ```
 
 :::note
-`AtomicButton` automatically creates a transparent `TextButton` named `Sensor` as a child of `Gui` if one does not already exist. You do not need to add one manually.
+`AtomicButton` automatically creates a transparent `TextButton` named `Sensor` as a child of `Gui` if one does not already exist. You do not need to add one manually. `GetSensor()` returns it, which is useful for gamepad navigation since selection lands on the sensor rather than the pane's `Gui`.
 :::
 
 ---

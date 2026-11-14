@@ -27,9 +27,28 @@ To get started working with Order, you can use any of the options detailed below
 2. Select the proper owner, add a name, choose your desired visiblity options, and click "Create repository from template"
 3. Using the software of your choice (I typically use VS Code's Source Control menu), clone your new repository to your computer
 
-### 3) Initialize Wally
-1. If you don't yet have Wally, you can install it [from here.](https://github.com/UpliftGames/wally)
-2. Open a terminal in your new project's directory and run the command `wally install` to get the included packages.
+### 3) Install packages
+Order supports two package managers. [Forest](https://docs.forest.dev/) is recommended, and Wally is still supported.
+
+<Tabs groupId="package-manager">
+<TabItem value="forest" label="Forest (recommended)" default>
+
+1. Install [Rokit](https://github.com/rojo-rbx/rokit), then run `rokit install` in your project's directory. This installs Rojo, StyLua and the Forest CLI at the versions listed in `rokit.toml`.
+2. Run `forest install`. Forest reads `forest.json`, installs shared packages into `Packages` and server-only packages into `ServerPackages`.
+3. Commit `forest-lock.json` whenever it changes, so every machine installs the same versions.
+
+</TabItem>
+<TabItem value="wally" label="Wally">
+
+1. If you don't yet have Wally, you can install it [from here](https://github.com/UpliftGames/wally), or through Rokit or Aftman.
+2. Run `wally install` in your project's directory to get the packages in `wally.toml`.
+
+</TabItem>
+</Tabs>
+
+:::tip
+Use one package manager per project. Forest removes Wally's `_Index` folders the next time it installs, and `forest init --project` converts an existing `wally.toml` into a `forest.json`.
+:::
 
 ### 4) Project configuration
 1. Open the new repository in VS Code and then open the `default.project.json` file

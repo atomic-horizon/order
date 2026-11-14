@@ -3,6 +3,10 @@ name: publish-docs
 on:
   push:
     branches: ["docs"]
+  # Refreshes the homepage showcase stats weekly
+  schedule:
+    - cron: "0 9 * * 1"
+  workflow_dispatch:
 jobs:
   status:
     runs-on: ubuntu-latest
@@ -15,6 +19,8 @@ jobs:
         with:
           node-version: "22"
       - run: npm i -g moonwave@latest
+      - name: Refresh showcase stats
+        run: node scripts/fetch-showcase.mjs
       - name: Publish
         run: |
           git remote set-url origin https://git:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git
