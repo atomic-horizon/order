@@ -2,7 +2,7 @@
 
 	Author(s): ChiefWildin
 	Module: AtomicButton.luau
-	Version: 1.3.2
+	Version: 1.4.0
 
 ]]
 
@@ -26,6 +26,7 @@ export type AtomicButton = {
 	IsHovered: (self: AtomicButton) -> boolean,
 	IsPressed: (self: AtomicButton) -> boolean,
 	IsSelected: (self: AtomicButton) -> boolean,
+	GetSensor: (self: AtomicButton) -> TextButton,
 	SetEnabled: (self: AtomicButton, enabled: boolean) -> (),
 	SetHovered: (self: AtomicButton, hovered: boolean) -> (),
 	SetPressed: (self: AtomicButton, pressed: boolean) -> (),
@@ -255,10 +256,20 @@ function AtomicButton:IsSelected(): boolean
 end
 
 --[=[
+	Returns the button's sensor, the TextButton that receives input. Useful for
+	gamepad navigation, which selects the sensor rather than the pane's Gui.
+
+	@return TextButton
+]=]
+function AtomicButton:GetSensor(): TextButton
+	return self._sensor
+end
+
+--[=[
 	@tag Constructor
 	Creates a new AtomicButton based on the template key or existing frame.
-	Instances are mapped based on a simple descendants search, so unique names
-	are required for consistency.
+	Instances are found breadth first, so when names repeat the shallowest
+	match wins. Unique names are still recommended for consistency.
 
 	@param template string | Instance -- The name of a GuiObject in ReplicatedStorage.GuiTemplates or an existing instance to use as the button's Gui.
 	@param instanceKeys table -- A mapping of instance names to keys for quick access
