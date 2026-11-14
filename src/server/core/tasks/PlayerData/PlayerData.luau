@@ -2,7 +2,7 @@
 
 	PlayerData.lua
 	ChiefWildin
-	Version: 3.0.0
+	Version: 3.0.1
 
 	Handles the implementation of ProfileStore and ReplicaService for
 	managing player data.
@@ -362,10 +362,15 @@ end
 	@param player Player -- The player whose data is being modified.
 	@param keyPath string | { string } -- The path to the value being modified, either as a dot-separated string or an array of strings.
 	@param increment number -- The amount to increment the value by. Must be a non-zero number.
-	@return number? -- The new value after incrementing, or nil if the increment was invalid.
+	@return number? -- The new value after incrementing, or nil if the increment was invalid or the player's data is not loaded.
 ]=]
 function PlayerData:IncrementNumValue(player: Player, keyPath: string | { string }, increment: number): number?
 	if typeof(increment) ~= "number" or increment == 0 then
+		return nil
+	end
+
+	if not self:GetPlayerDataReplica(player) then
+		warnMissingData(player, "increment value", keyPath)
 		return nil
 	end
 
