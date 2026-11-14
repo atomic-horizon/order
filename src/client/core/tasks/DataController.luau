@@ -2,7 +2,7 @@
 
 	Module: DataController.luau
 	Author(s): ChiefWildin
-	Version: 2.4.0
+	Version: 2.4.1
 
 ]]
 
@@ -56,6 +56,13 @@ local function deepCopy(target: {}): {}
 	return copy
 end
 
+-- Stands in for a replica listener in Edit mode, where data never changes
+local function editModeListener(): { Disconnect: () -> () }
+	return {
+		Disconnect = function() end,
+	}
+end
+
 -- Public functions
 
 --[=[
@@ -70,7 +77,8 @@ function DataController:GetDataReplica(): Replica
 		if not RunService:IsRunning() then
 			PlayerDataReplica = {
 				Data = deepCopy(shared("ProfileTemplate")),
-				ListenToChange = function() end,
+				ListenToChange = editModeListener,
+				ListenToNewKey = editModeListener,
 			} :: Replica
 		else
 			task.wait()
@@ -118,12 +126,16 @@ function DataController:GetValue(keyPath: string | { string }): any?
 	end
 
 	local currentLocation = self:GetData()
-	for count, index in indices do
-		if count == #indices then
-			return currentLocation[index]
+	for _, index in indices do
+		-- A path through missing data reads as nil, the same as a missing key
+		if typeof(currentLocation) ~= "table" then
+			return nil
 		end
+
 		currentLocation = currentLocation[index]
 	end
+
+	return currentLocation
 end
 
 --[=[
@@ -140,7 +152,10 @@ end
 	@param callback function -- Called with (newValue, oldValue) immediately and on every change
 	@return RBXScriptConnection
 ]=]
-function DataController:Observe(path: string, callback: (newValue: any, oldValue: any) -> ()): RBXScriptConnection
+function DataController:Observe(
+	path: string | { string },
+	callback: (newValue: any, oldValue: any) -> ()
+): RBXScriptConnection
 	local value = DataController:GetValue(path)
 	task.spawn(callback, value, value)
 	return self:GetDataReplica():ListenToChange(path, callback)

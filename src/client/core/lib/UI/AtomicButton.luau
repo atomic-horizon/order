@@ -2,21 +2,21 @@
 
 	Author(s): ChiefWildin
 	Module: AtomicButton.luau
-	Version: 1.3.1
+	Version: 1.4.0
 
 ]]
 
 -- Dependencies
 
-local AtomicPane = shared("AtomicPane") ---@module AtomicPane
--- local Sounds = shared("Sounds") ---@module Sounds
+local AtomicPane = shared("AtomicPane")
 
 -- Types
 
-export type AtomicButtonImpl = ({
+export type AtomicButton = {
 	-- Metatable members
 
-	__index: AtomicButtonImpl,
+	__index: AtomicButton,
+	ClassName: "AtomicButton",
 
 	-- Public members
 
@@ -26,10 +26,17 @@ export type AtomicButtonImpl = ({
 	IsHovered: (self: AtomicButton) -> boolean,
 	IsPressed: (self: AtomicButton) -> boolean,
 	IsSelected: (self: AtomicButton) -> boolean,
+	GetSensor: (self: AtomicButton) -> TextButton,
 	SetEnabled: (self: AtomicButton, enabled: boolean) -> (),
 	SetHovered: (self: AtomicButton, hovered: boolean) -> (),
 	SetPressed: (self: AtomicButton, pressed: boolean) -> (),
 	SetSelected: (self: AtomicButton, selected: boolean) -> (),
+
+	Activated: RBXScriptSignal,
+	Hovered: RBXScriptSignal,
+	Enabled: RBXScriptSignal,
+	Pressed: RBXScriptSignal,
+	Selected: RBXScriptSignal,
 
 	-- Private members
 
@@ -38,32 +45,15 @@ export type AtomicButtonImpl = ({
 	_isHovered: boolean,
 	_isPressed: boolean,
 	_isSelected: boolean,
-} & AtomicPane.AtomicPaneImpl)?
 
-export type AtomicButton = typeof(setmetatable(
-	{} :: ({
-		-- Constructed public members
+	_activated: BindableEvent,
+	_hovered: BindableEvent,
+	_enabled: BindableEvent,
+	_pressed: BindableEvent,
+	_selected: BindableEvent,
 
-		Activated: RBXScriptSignal,
-		Hovered: RBXScriptSignal,
-		Enabled: RBXScriptSignal,
-		Pressed: RBXScriptSignal,
-		Selected: RBXScriptSignal,
-
-		-- Constructed private members
-
-		_activated: BindableEvent,
-		_hovered: BindableEvent,
-		_enabled: BindableEvent,
-		_pressed: BindableEvent,
-		_selected: BindableEvent,
-
-		_sensor: TextButton,
-
-		[string]: any,
-	} & AtomicPane.AtomicPane) | {},
-	{} :: AtomicButtonImpl
-))
+	_sensor: TextButton,
+} & AtomicPane.AtomicPane
 
 -- Module Declaration
 
@@ -116,7 +106,7 @@ export type AtomicButton = typeof(setmetatable(
 	return ExampleButton
 	```
 ]=]
-local AtomicButton: AtomicButtonImpl = setmetatable({}, AtomicPane) :: AtomicButtonImpl
+local AtomicButton = setmetatable({}, AtomicPane)
 AtomicButton.__index = AtomicButton
 AtomicButton.ClassName = "AtomicButton"
 
@@ -161,7 +151,6 @@ end
 ]=]
 function AtomicButton:Activate()
 	self._activated:Fire()
-	-- Sounds:PlaySound("Click")
 end
 
 --[=[
@@ -199,10 +188,6 @@ function AtomicButton:SetHovered(hovered: boolean)
 	self._isHovered = hovered
 	self._hovered:Fire(hovered)
 	self:SetSpring("Hovered", hovered and 1 or 0)
-
-	-- if hovered then
-	-- 	Sounds:PlaySound("Hover")
-	-- end
 end
 
 --[=[
@@ -271,10 +256,20 @@ function AtomicButton:IsSelected(): boolean
 end
 
 --[=[
+	Returns the button's sensor, the TextButton that receives input. Useful for
+	gamepad navigation, which selects the sensor rather than the pane's Gui.
+
+	@return TextButton
+]=]
+function AtomicButton:GetSensor(): TextButton
+	return self._sensor
+end
+
+--[=[
 	@tag Constructor
 	Creates a new AtomicButton based on the template key or existing frame.
-	Instances are mapped based on a simple descendants search, so unique names
-	are required for consistency.
+	Instances are found breadth first, so when names repeat the shallowest
+	match wins. Unique names are still recommended for consistency.
 
 	@param template string | Instance -- The name of a GuiObject in ReplicatedStorage.GuiTemplates or an existing instance to use as the button's Gui.
 	@param instanceKeys table -- A mapping of instance names to keys for quick access

@@ -1,7 +1,7 @@
 --[[ File Info
 	CharacterUtils.luau
 	@TactBacon
-	Version: 1.7.3
+	Version: 1.8.0
 
 	Provides utility functions for working with characters.  Adds callbacks for
 	character spawning and provides a maid for cleaning up when the character is
@@ -224,14 +224,58 @@ local CharacterUtils = {}
 -- Constants
 
 local IS_CLIENT = RunService:IsClient()
+-- An Animator loads at most 64 AnimationTracks, and the default Animate script
+-- uses a large share of them. Cached tracks are capped well below what is left
+-- so systems that play animations elsewhere still have room.
+local MAX_CACHED_ANIMATION_TRACKS = 16
 
 -- Global Variables
 
 local AnySpawnCallbackConnections = {} :: { [string | number]: RBXScriptConnection }
 local CharacterChildCache = {} :: { [Model]: { [string]: Instance } }
 local CharacterMaids = {} :: { [Player]: { Maid } }
+-- Cached animation track keys for each character maid, least recently played first
+local CachedAnimationOrder = setmetatable({}, { __mode = "k" }) :: { [Maid]: { string } }
 local LocalPlayer = Players.LocalPlayer
 local SpawnCallbacks = {} :: { [Player]: {} }
+
+-- Private Functions
+
+-- Records that a cached track was just played, then evicts the least recently
+-- played cached tracks past the cap. Tracks that are playing are never evicted,
+-- since destroying one mid-playback snaps the character out of its pose.
+local function markCachedAnimationPlayed(characterMaid: Maid, trackKey: string)
+	local playOrder = CachedAnimationOrder[characterMaid]
+	if not playOrder then
+		playOrder = {}
+		CachedAnimationOrder[characterMaid] = playOrder
+	end
+
+	-- Drop keys whose tracks were cleaned up with the character
+	for index = #playOrder, 1, -1 do
+		local key = playOrder[index]
+		if key == trackKey or characterMaid[key] == nil then
+			table.remove(playOrder, index)
+		end
+	end
+
+	table.insert(playOrder, trackKey)
+
+	local candidateIndex = 1
+	while #playOrder > MAX_CACHED_ANIMATION_TRACKS and candidateIndex < #playOrder do
+		local candidateKey = playOrder[candidateIndex]
+		local candidateTrack = characterMaid[candidateKey] :: AnimationTrack?
+
+		if candidateTrack and candidateTrack.IsPlaying then
+			candidateIndex += 1
+			continue
+		end
+
+		-- Clearing the key makes the maid destroy the track
+		characterMaid[candidateKey] = nil
+		table.remove(playOrder, candidateIndex)
+	end
+end
 
 -- Public Functions
 
@@ -526,11 +570,22 @@ function CharacterUtils:GetCharacterMaid(player: Player | Model): Maid
 
 	assert(player, "Attempt to get a character maid for an invalid player")
 
-	if not CharacterMaids[player] then
-		CharacterMaids[player] = Maid.new()
+	if CharacterMaids[player] then
+		return CharacterMaids[player]
 	end
 
-	return CharacterMaids[player]
+	local characterMaid = Maid.new()
+
+	-- PlayerRemoving has already fired for a player who has left, so a maid
+	-- stored now would never be cleaned up. Hand back one that cleans itself.
+	if not player.Parent then
+		task.defer(characterMaid.DoCleaning, characterMaid)
+		return characterMaid
+	end
+
+	CharacterMaids[player] = characterMaid
+
+	return characterMaid
 end
 
 --[=[
@@ -658,6 +713,7 @@ function CharacterUtils:PlayAnimationOnCharacter(
 	if playerObject then
 		characterMaid = CharacterUtils:GetCharacterMaid(playerObject)
 		if characterMaid[`Anim.{animationId}`] then
+			markCachedAnimationPlayed(characterMaid, `Anim.{animationId}`)
 			characterMaid[`Anim.{animationId}`]:Play()
 			return characterMaid[`Anim.{animationId}`]
 		end
@@ -670,6 +726,7 @@ function CharacterUtils:PlayAnimationOnCharacter(
 
 	if characterMaid and not options.shouldNotCache then
 		characterMaid[`Anim.{animationId}`] = animationTrack
+		markCachedAnimationPlayed(characterMaid, `Anim.{animationId}`)
 	end
 
 	animationTrack:Play(options.fadeTime, options.weight, options.speed)

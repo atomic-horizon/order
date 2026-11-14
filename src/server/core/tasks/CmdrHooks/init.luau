@@ -1,7 +1,7 @@
 --[[
     Author: ChiefWildin
     Module: CmdrHooks.lua
-    Version: 1.1.0
+    Version: 1.1.1
 ]]
 
 -- Services
@@ -29,10 +29,10 @@ local CmdrHooks = {}
 -- Job Initialization
 
 function CmdrHooks:Init()
-	Cmdr:RegisterDefaultCommands()
-    Cmdr:RegisterCommandsIn(script.CustomCommands)
-    Cmdr:RegisterTypesIn(script.CustomTypes)
-	Cmdr:RegisterHooksIn(script.CustomHooks)
+	Cmdr.Registry:RegisterDefaultCommands()
+	Cmdr.Registry:RegisterCommandsIn(script.CustomCommands)
+	Cmdr.Registry:RegisterTypesIn(script.CustomTypes)
+	Cmdr.Registry:RegisterHooksIn(script.CustomHooks)
 end
 
 return CmdrHooks

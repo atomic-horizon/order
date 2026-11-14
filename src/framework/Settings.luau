@@ -5,12 +5,19 @@ export type Initializer = {
 	WarnDelay: number,
 }
 
+export type Environment = "Production" | "Testing"
+
+export type PlaceTypeEntry = {
+	Type: string,
+	Environment: Environment?,
+}
+
 export type OrderSettings = {
 	Debug: {
 		CyclicAnalysis: boolean,
 		VerboseLoading: boolean,
 	},
-	PlaceTypes: { [number]: string },
+	PlaceTypes: { [number]: string | PlaceTypeEntry },
 	CodeGroups: { [string]: { [string]: true } },
 	InitOrder: "Individual" | "Project",
 	InitFunctionConfig: { Initializer },
@@ -29,8 +36,14 @@ return {
 
 	-- A mapping of PlaceIds to their place type aliases. This determines the
 	-- code groups that are loaded for the current place.
+	--
+	-- An entry can also be a table that sets the place's environment:
+	-- "Production" (the default) or "Testing". Testing places share one
+	-- testing data store instead of the production store. Places that are not
+	-- listed are "Generic" and "Production".
 	PlaceTypes = {
 		-- [123456789] = "MyPlaceType",
+		-- [987654321] = { Type = "MyPlaceType", Environment = "Testing" },
 	},
 
 	-- A mapping of place type aliases to the active code groups for that type.

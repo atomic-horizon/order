@@ -146,7 +146,7 @@
 			"local Story = {",
 			"\tcontrols = {",
 			"\t\tVisible = true,",
-			"\t}",
+			"\t},",
 			"\trender = function(props)",
 			"\t\tlocal pane = ${TM_FILENAME_BASE/^(.*)\\..*/$1/}.new(props.target)",
 			"",

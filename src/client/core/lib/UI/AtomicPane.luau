@@ -2,16 +2,16 @@
 
 	Author(s): ChiefWildin
 	Module: AtomicPane.luau
-	Version: 1.2.1
+	Version: 1.3.0
 
 ]]
 
 -- Dependencies
 
-local AnimNation = shared("AnimNation") ---@module AnimNation
-local GuiTemplates = shared("GuiTemplates") ---@module GuiTemplates
-local lerp = shared("lerp") ---@module lerp
-local Maid = shared("Maid") ---@module Maid
+local AnimNation = shared("AnimNation")
+local GuiTemplates = shared("GuiTemplates")
+local lerp = shared("lerp")
+local Maid = shared("Maid")
 
 -- Types
 
@@ -26,14 +26,18 @@ type UIElement =
 	| ViewportFrame
 	| CanvasGroup
 	| UIStroke
-export type AtomicPaneImpl = {
+export type AtomicPane = {
 	-- Metatable members
 
-	__index: AtomicPaneImpl,
+	__index: AtomicPane,
 
 	-- Public members
 
 	ClassName: string,
+	Destroying: RBXScriptSignal,
+	Gui: Frame,
+	Maid: Maid.Maid,
+	VisibleChanged: RBXScriptSignal,
 
 	new: (template: string | Instance, instanceKeys: { [string]: string }) -> AtomicPane,
 	Destroy: (self: AtomicPane) -> (),
@@ -43,39 +47,30 @@ export type AtomicPaneImpl = {
 	Show: (self: AtomicPane, doNotAnimate: boolean?) -> (),
 	Hide: (self: AtomicPane, doNotAnimate: boolean?) -> (),
 	Toggle: (self: AtomicPane, doNotAnimate: boolean?) -> (),
-	AddSpring: (self: AtomicPane, name: string, info: AnimNation.SpringInfo?) -> AnimNation.Spring,
-	AddSprings: (self: AtomicPane, springs: { string }, info: AnimNation.SpringInfo?) -> (),
+	AddSpring: (self: AtomicPane, name: string, info: AnimNation.SpringInfo) -> AnimNation.Spring,
+	AddSprings: (self: AtomicPane, springs: { string }, info: AnimNation.SpringInfo) -> (),
 	SetSpring: (self: AtomicPane, name: string, value: number, instant: boolean?) -> (),
 	SetAlphaAnimationEnabled: (self: AtomicPane, enabled: boolean) -> (),
-	MapAlpha: (self: AtomicPane, element: UIElement) -> (),
+	MapAlpha: (self: AtomicPane, element: UIElement, exclusions: { Instance }?) -> (),
+	UnmapAlpha: (self: AtomicPane, element: Instance) -> (),
+	SetMappedAlpha: (self: AtomicPane, element: Instance, property: string, visibleAlpha: number) -> (),
 
 	-- Private members
 
+	_alphaMap: { [UIElement]: { [string]: number } },
+	_alphaAnimationDisabled: boolean?,
+	_destroying: BindableEvent,
 	_draw: (self: AtomicPane) -> (),
 	_drawMappedAlphas: (self: AtomicPane) -> (),
+	_drawMappedElement: (self: AtomicPane, element: Instance) -> (),
+	_mapAlphaRecursive: (self: AtomicPane, element: Instance, excludedSet: { [Instance]: boolean }) -> (),
+	_maid: Maid.Maid,
+	_springs: { [string]: AnimNation.Spring },
 	_update: (self: AtomicPane) -> (),
 	_useStoryControls: (self: AtomicPane) -> (),
+	_visible: boolean,
+	_visibleChanged: BindableEvent,
 }
-export type AtomicPane = typeof(setmetatable(
-	{} :: {
-		-- Constructed public members
-		Gui: Frame,
-		Maid: Maid.Maid,
-		VisibleChanged: RBXScriptSignal,
-		Destroying: RBXScriptSignal,
-
-		-- Constructed private members
-		_alphaMap: { [UIElement]: { [string]: number } },
-		_alphaAnimationDisabled: boolean?,
-		_destroyed: boolean?,
-		_destroying: BindableEvent,
-		_maid: Maid.Maid,
-		_springs: { [string]: AnimNation.Spring },
-		_visible: boolean,
-		_visibleChanged: BindableEvent,
-	},
-	{} :: AtomicPaneImpl
-))
 export type Spring = AnimNation.Spring
 
 -- Module Declaration
@@ -122,7 +117,7 @@ export type Spring = AnimNation.Spring
 	return ExamplePane
 	```
 ]=]
-local AtomicPane: AtomicPaneImpl = {} :: AtomicPaneImpl
+local AtomicPane = {}
 AtomicPane.__index = AtomicPane
 AtomicPane.ClassName = "AtomicPane"
 
@@ -141,9 +136,80 @@ function AtomicPane:_draw() end
 	UI elements.
 ]=]
 function AtomicPane:_drawMappedAlphas()
-	for element, properties in self._alphaMap do
-		for property, visibleAlpha in properties do
-			element[property] = lerp(visibleAlpha, 1, self._springs.Alpha.Position)
+	for element in self._alphaMap do
+		self:_drawMappedElement(element)
+	end
+end
+
+--[=[
+	@private
+	Draws one mapped element at the pane's current alpha. Springs overshoot, so
+	the result is clamped to the range transparency accepts.
+]=]
+function AtomicPane:_drawMappedElement(element: Instance)
+	local properties = self._alphaMap[element]
+	if not properties then
+		return
+	end
+
+	local alpha = self._springs.Alpha.Position
+	for property, visibleAlpha in properties do
+		(element :: any)[property] = math.clamp(lerp(visibleAlpha, 1, alpha), 0, 1)
+	end
+end
+
+--[=[
+	@private
+	Maps one element and its descendants, skipping any excluded subtree.
+]=]
+function AtomicPane:_mapAlphaRecursive(element: Instance, excludedSet: { [Instance]: boolean })
+	if excludedSet[element] then
+		return
+	end
+
+	local isCanvas = element:IsA("CanvasGroup")
+
+	if element:IsA("GuiObject") or element:IsA("UIStroke") then
+		local isNewlyMapped = self._alphaMap[element] == nil
+		local properties = self._alphaMap[element] or {}
+		self._alphaMap[element] = properties
+
+		if element:IsA("GuiObject") then
+			properties.BackgroundTransparency = element.BackgroundTransparency
+		end
+
+		if element:IsA("TextLabel") or element:IsA("TextBox") or element:IsA("TextButton") then
+			properties.TextTransparency = element.TextTransparency
+		end
+
+		if element:IsA("ImageLabel") or element:IsA("ImageButton") or element:IsA("ViewportFrame") then
+			properties.ImageTransparency = element.ImageTransparency
+		end
+
+		if element:IsA("UIStroke") then
+			properties.Transparency = element.Transparency
+		end
+
+		if element:IsA("CanvasGroup") then
+			properties.GroupTransparency = element.GroupTransparency
+		end
+
+		if isNewlyMapped then
+			element.Destroying:Once(function()
+				-- Destroying handlers are deferred, so this can run after the
+				-- pane itself was destroyed and its fields cleared
+				if self._alphaMap then
+					self._alphaMap[element] = nil
+				end
+			end)
+		end
+
+		self:_drawMappedElement(element)
+	end
+
+	for _, child in element:GetChildren() do
+		if not isCanvas or child:IsA("UIStroke") then
+			self:_mapAlphaRecursive(child, excludedSet)
 		end
 	end
 end
@@ -153,10 +219,6 @@ end
 	Runs the specific ordering of draw functions for the AtomicPane.
 ]=]
 function AtomicPane:_update()
-	if self._destroyed then
-		return
-	end
-
 	self:_drawMappedAlphas()
 	self:_draw()
 end
@@ -197,50 +259,59 @@ end
 --[=[
 	Caches the current transparency values of the specified instance and all its
 	descendants in an internal table for automatic interpolation based on the
-	`Alpha` spring.
+	`Alpha` spring, then draws them at the pane's current alpha.
+
+	The cached values are what each element shows when the pane is fully
+	visible, so map elements while they look the way they should when visible.
 
 	@param element Instance -- The top-level instance to map transparencies for
+	@param exclusions {Instance}? -- Instances whose subtrees are skipped, such as nested components that drive their own transparencies
 ]=]
 function AtomicPane:MapAlpha(
-	element: GuiObject | Frame | TextLabel | TextBox | TextButton | ImageLabel | ImageButton | ViewportFrame | CanvasGroup | UIStroke
+	element: GuiObject | Frame | TextLabel | TextBox | TextButton | ImageLabel | ImageButton | ViewportFrame | CanvasGroup | UIStroke,
+	exclusions: { Instance }?
 )
-	local isCanvas = element:IsA("CanvasGroup")
-
-	if element:IsA("GuiObject") or element:IsA("UIStroke") then
-		if not self._alphaMap[element] then
-			self._alphaMap[element] = {}
-		end
-
-		if element:IsA("GuiObject") then
-			self._alphaMap[element].BackgroundTransparency = element.BackgroundTransparency
-		end
-
-		if element:IsA("TextLabel") or element:IsA("TextBox") or element:IsA("TextButton") then
-			self._alphaMap[element].TextTransparency = element.TextTransparency
-		end
-
-		if element:IsA("ImageLabel") or element:IsA("ImageButton") or element:IsA("ViewportFrame") then
-			self._alphaMap[element].ImageTransparency = element.ImageTransparency
-		end
-
-		if element:IsA("UIStroke") then
-			self._alphaMap[element].Transparency = element.Transparency
-		end
-
-		if isCanvas then
-			self._alphaMap[element].GroupTransparency = element.GroupTransparency
-		end
+	local excludedSet = {}
+	for _, excludedInstance in exclusions or {} do
+		excludedSet[excludedInstance] = true
 	end
 
-	element.Destroying:Once(function()
-		self._alphaMap[element] = nil
-	end)
+	self:_mapAlphaRecursive(element, excludedSet)
+end
 
-	for _, child in element:GetChildren() do
-		if not isCanvas or child:IsA("UIStroke") then
-			self:MapAlpha(child)
-		end
+--[=[
+	Stops driving the specified instance and its descendants from the `Alpha`
+	spring. Their transparencies are left as they are, for when another
+	animation takes them over.
+
+	@param element Instance -- The top-level instance to stop driving
+]=]
+function AtomicPane:UnmapAlpha(element: Instance)
+	self._alphaMap[element] = nil
+
+	for _, descendant in element:GetDescendants() do
+		self._alphaMap[descendant] = nil
 	end
+end
+
+--[=[
+	Changes the transparency a mapped property shows when the pane is fully
+	visible, and draws it at the pane's current alpha. For elements whose
+	resting look changes after they were mapped.
+
+	@param element Instance -- A mapped instance
+	@param property string -- The transparency property, such as "BackgroundTransparency"
+	@param visibleAlpha number -- The value it shows when the pane is fully visible
+]=]
+function AtomicPane:SetMappedAlpha(element: Instance, property: string, visibleAlpha: number)
+	local properties = self._alphaMap[element]
+	if not properties or properties[property] == nil then
+		warn(`[AtomicPane] {element:GetFullName()}.{property} is not mapped`)
+		return
+	end
+
+	properties[property] = visibleAlpha
+	self:_drawMappedElement(element)
 end
 
 --[=[
@@ -268,27 +339,33 @@ end
 	`_draw` function and be available in the `_springs` table.
 
 	@param name string -- The name of the spring to add
-	@param info table -- The spring parameters to define the initial spring	values, defaults to { s = 30, d = 1, i = 0 }
+	@param info SpringInfo? -- The spring parameters to define the initial spring values
 ]=]
 function AtomicPane:AddSpring(name: string, info: AnimNation.SpringInfo?): AnimNation.Spring
-	info = info or { s = 30, d = 1, i = 0 }
+	if name == "Visible" then
+		warn(
+			`{self.ClassName} is adding a spring with the name "Visible", recommended to use "Alpha" instead to avoid accidental conflict with :SetVisible()`
+		)
+	end
+
+	local springInfo = info or { s = 30, d = 1, i = 0 }
 
 	if self._springs[name] then
-		for key, value in info do
+		for key, value in springInfo do
 			self._springs[name][key] = value
 		end
 	else
-		self._springs[name] = AnimNation.createSpring(info)
+		self._springs[name] = AnimNation.createSpring(springInfo)
 
 		-- Add spring binds cleanup to maid
 		self._maid:GiveTask(self._springs[name])
 
 		-- Bind spring update to gui update
-		task.defer(function()
-			self._springs[name]:Bind("Update", function()
-				self:_update()
-			end)
+		self._springs[name]:Bind("Update", function()
+			self:_update()
 		end)
+
+		task.defer(self._update, self)
 	end
 
 	return self._springs[name]
@@ -346,12 +423,7 @@ end
 	@param doNotAnimate boolean? -- Whether the transition is animated or instant
 ]=]
 function AtomicPane:Hide(doNotAnimate: boolean?)
-	local success, message = pcall(function()
-		self:SetVisible(false, doNotAnimate)
-	end)
-	if not success then
-		warn(`Failed to hide AtomicPane: {message}`, self)
-	end
+	self:SetVisible(false, doNotAnimate)
 end
 
 --[=[
@@ -385,11 +457,18 @@ end
 
 	@param self AtomicPane
 ]=]
-function AtomicPane.Destroy(self: any | AtomicPane)
-	self._destroyed = true
+function AtomicPane.Destroy(self: AtomicPane)
+	if not self._maid then
+		return
+	end
+
 	self._destroying:Fire()
 	-- Defer so that the signal connections can process
 	task.defer(function()
+		if not self._maid then
+			return
+		end
+
 		self._maid:Destroy()
 		self._maid = nil
 		self.Maid = nil
@@ -410,8 +489,8 @@ end
 --[=[
 	@tag Constructor
 	Creates a new AtomicPane based on the template key or existing frame.
-	Instances are mapped based on a simple descendants search, so unique names
-	are required for consistency.
+	Instances are found breadth first, so when names repeat the shallowest
+	match wins. Unique names are still recommended for consistency.
 
 	@param template string | Instance -- The name of a GuiObject in ReplicatedStorage.GuiTemplates or an existing instance to use as the pane's Gui.
 	@param instanceKeys table -- A mapping of instance names to keys for quick access
@@ -444,7 +523,7 @@ end
 	@private
 	A table of all of the pane's springs. Includes the Alpha spring by default.
 ]=]
-function AtomicPane.new(template: string | Instance, instanceKeys: { [string]: string }?)
+function AtomicPane.new(template: string | Instance, instanceKeys: { [string]: string }?): AtomicPane
 	assert(
 		typeof(template) == "string" or typeof(template) == "Instance",
 		"Template must be an existing instance or name of a GuiTemplate."
@@ -492,13 +571,20 @@ function AtomicPane.new(template: string | Instance, instanceKeys: { [string]: s
 		revKeyToInstances[v] = k
 	end
 
-	local name, key
-	for _, descendant in gui:GetDescendants() do
-		name = descendant.Name
-		key = revKeyToInstances[name]
-		if key then
-			revKeyToInstances[name] = nil
-			self[key] = descendant
+	local searchQueue = { gui }
+	local queueIndex = 1
+	while queueIndex <= #searchQueue and next(revKeyToInstances) do
+		local searchedInstance = searchQueue[queueIndex]
+		queueIndex += 1
+
+		for _, child in searchedInstance:GetChildren() do
+			local key = revKeyToInstances[child.Name]
+			if key then
+				revKeyToInstances[child.Name] = nil
+				self[key] = child
+			end
+
+			table.insert(searchQueue, child)
 		end
 	end
 

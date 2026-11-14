@@ -2,7 +2,7 @@
 
 	Author: ChiefWildin
 	Module: GetRemote.lua
-	Version: 1.5.0
+	Version: 1.6.0
 
 ]]
 
@@ -51,6 +51,12 @@ local PRINT_CLIENT_INVOKES = false
 local PRINT_SERVER_EVENTS = false
 local PRINT_SERVER_INVOKES = false
 
+-- The stream used by rate limited callbacks without a key getter. A table, so
+-- no key sent by a client can collide with it.
+local DEFAULT_RATE_LIMIT_STREAM = {}
+-- Owns the client's rate limit state, where there is no player to key it by
+local CLIENT_RATE_LIMIT_OWNER = {}
+
 -- Global Variables
 
 local AllRemotes = {}
@@ -62,13 +68,59 @@ local RequestFunction: RemoteFunction
 
 -- Types
 
+-- Receives an event's arguments and returns the key of the rate limit stream
+-- the event belongs to. Each stream is rate limited separately.
+export type RateLimitKeyGetter = (...any) -> any
+
+type RateLimitStream = {
+	LastProcessedTime: number,
+	PendingArgs: { n: number, [number]: any }?,
+}
+
+-- Returned by the event connection methods. The underlying connection is made
+-- asynchronously, so this handle stands in for it and can be given to a Maid.
+export type RemoteConnection = {
+	Connected: boolean,
+	Disconnect: (self: RemoteConnection) -> (),
+}
+
 export type Remote = {
-	OnEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
-	OnUnreliableEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
-	OnClientEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
-	OnClientUnreliableEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
-	OnServerEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
-	OnServerUnreliableEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
+	OnEvent: (
+		self: Remote,
+		callback: (...any) -> (),
+		rateLimitInterval: number?,
+		getRateLimitKey: RateLimitKeyGetter?
+	) -> RemoteConnection,
+	OnUnreliableEvent: (
+		self: Remote,
+		callback: (...any) -> (),
+		rateLimitInterval: number?,
+		getRateLimitKey: RateLimitKeyGetter?
+	) -> RemoteConnection,
+	OnClientEvent: (
+		self: Remote,
+		callback: (...any) -> (),
+		rateLimitInterval: number?,
+		getRateLimitKey: RateLimitKeyGetter?
+	) -> RemoteConnection,
+	OnClientUnreliableEvent: (
+		self: Remote,
+		callback: (...any) -> (),
+		rateLimitInterval: number?,
+		getRateLimitKey: RateLimitKeyGetter?
+	) -> RemoteConnection,
+	OnServerEvent: (
+		self: Remote,
+		callback: (...any) -> (),
+		rateLimitInterval: number?,
+		getRateLimitKey: RateLimitKeyGetter?
+	) -> RemoteConnection,
+	OnServerUnreliableEvent: (
+		self: Remote,
+		callback: (...any) -> (),
+		rateLimitInterval: number?,
+		getRateLimitKey: RateLimitKeyGetter?
+	) -> RemoteConnection,
 	OnInvoke: (self: Remote, callback: (player: Player, ...any) -> any) -> (),
 	FireClient: (self: Remote, player: Player, ...any) -> (),
 	FireClientUnreliable: (self: Remote, player: Player, ...any) -> (),
@@ -85,6 +137,7 @@ export type Remote = {
 	InvokeClient: (self: Remote, player: Player, ...any) -> any,
 	InvokeServer: (self: Remote, ...any) -> any,
 	Invoke: (self: Remote, ...any) -> (),
+	Destroy: (self: Remote) -> (),
 }
 
 export type RemoteForceLoad = { Event: boolean, UnreliableEvent: boolean, Function: boolean }
@@ -97,10 +150,87 @@ export type RemoteForceLoad = { Event: boolean, UnreliableEvent: boolean, Functi
 	and retrieved via [GetRemote](/api/GetRemote).
 ]=]
 
+-- Private Functions
+
+-- Runs `connect` in a new thread and returns a handle for the connection it
+-- makes. Disconnecting the handle before the connection exists disconnects it
+-- as soon as it is made.
+local function connectDeferred(connect: () -> RBXScriptConnection?): RemoteConnection
+	local underlyingConnection: RBXScriptConnection? = nil
+	local handle = {
+		Connected = true,
+	}
+
+	function handle.Disconnect(_self: RemoteConnection)
+		handle.Connected = false
+
+		if underlyingConnection then
+			underlyingConnection:Disconnect()
+			underlyingConnection = nil
+		end
+	end
+
+	task.spawn(function()
+		local newConnection = connect()
+		if not newConnection then
+			handle.Connected = false
+			return
+		end
+
+		if handle.Connected then
+			underlyingConnection = newConnection
+		else
+			newConnection:Disconnect()
+		end
+	end)
+
+	return handle :: RemoteConnection
+end
+
+-- Turns a Player or a list of Players into a set, or nil if neither was given
+local function toExcludedSet(excluded: Player | { Player }): { [Player]: true }?
+	if typeof(excluded) == "Instance" and excluded:IsA("Player") then
+		return { [excluded] = true }
+	end
+
+	if typeof(excluded) ~= "table" then
+		return nil
+	end
+
+	local excludedSet = {}
+	for _, player in excluded do
+		if typeof(player) == "Instance" and player:IsA("Player") then
+			excludedSet[player] = true
+		end
+	end
+
+	return excludedSet
+end
+
 -- Classes
 
 local Remote = {}
 Remote.__index = Remote
+
+-- Every method of a destroyed remote does nothing. The connection methods still
+-- return a handle, already disconnected, so callers can treat it as usual.
+local DestroyedRemote = {}
+DestroyedRemote.__index = function(_, key: string): any
+	if typeof(Remote[key]) ~= "function" then
+		return nil
+	end
+
+	if string.sub(key, 1, 2) == "On" and string.find(key, "Event", 1, true) then
+		return function(): RemoteConnection
+			return {
+				Connected = false,
+				Disconnect = function() end,
+			} :: any
+		end
+	end
+
+	return function() end
+end
 
 function Remote.new(name: string, forceLoad: RemoteForceLoad?): Remote
 	if AllRemotes[name] then
@@ -110,8 +240,9 @@ function Remote.new(name: string, forceLoad: RemoteForceLoad?): Remote
 	local self = setmetatable({}, Remote)
 
 	self._name = name
-	self._callbackProcessTimes = {}
-	self._callbackArgCache = {}
+	-- Rate limit streams by owner (a player, or the client), then callback, then stream key
+	self._rateLimitStreams = {} :: { [any]: { [any]: { [any]: RateLimitStream } } }
+	self._connections = {} :: { RBXScriptConnection }
 	self._event = nil :: RemoteEvent?
 	self._unreliableEvent = nil :: UnreliableRemoteEvent?
 	self._function = nil :: RemoteFunction?
@@ -119,18 +250,12 @@ function Remote.new(name: string, forceLoad: RemoteForceLoad?): Remote
 	AllRemotes[name] = self
 
 	if IS_SERVER then
-		local function registerPlayerArgs(player: Player)
-			self._callbackArgCache[player] = {}
-			self._callbackProcessTimes[player] = {}
-		end
-		Players.PlayerAdded:Connect(registerPlayerArgs)
-		for _, player in pairs(Players:GetPlayers()) do
-			registerPlayerArgs(player)
-		end
-		Players.PlayerRemoving:Connect(function(player: Player)
-			self._callbackArgCache[player] = nil
-			self._callbackProcessTimes[player] = nil
-		end)
+		table.insert(
+			self._connections,
+			Players.PlayerRemoving:Connect(function(player: Player)
+				self._rateLimitStreams[player] = nil
+			end)
+		)
 	end
 
 	if forceLoad and RunService:IsRunning() then
@@ -274,47 +399,86 @@ end
 function Remote:_connectRateLimitedCallback(
 	event: RBXScriptSignal,
 	callback: (...any) -> (),
-	rateLimitInterval: number
+	rateLimitInterval: number,
+	getRateLimitKey: RateLimitKeyGetter?
 ): RBXScriptConnection
 	if typeof(rateLimitInterval) ~= "number" then
+		local intervalType = typeof(rateLimitInterval)
 		warn(
-			"Invalid rate limit interval provided to OnUnreliableEvent for remote "
-				.. self._name
-				.. " - expected number, got "
-				.. typeof(rateLimitInterval)
-				.. "\n"
-				.. debug.traceback()
+			`Invalid rate limit interval provided for remote {self._name} - expected number, got {intervalType}\n{debug.traceback()}`
 		)
 		return event:Connect(callback)
 	end
 
 	return event:Connect(function(...)
-		local args = { ... }
-		local player = args[1]
+		local owner = if IS_SERVER then (...) else CLIENT_RATE_LIMIT_OWNER
+		local now = os.clock()
 
-		local processTimes = IS_SERVER and self._callbackProcessTimes[player] or self._callbackProcessTimes
-		local argCache = IS_SERVER and self._callbackArgCache[player] or self._callbackArgCache
+		local ownerStreams = self._rateLimitStreams[owner]
+		if not ownerStreams then
+			-- A player who has already left has nothing left to process
+			if IS_SERVER and not (owner :: Player).Parent then
+				return
+			end
 
-		local lastProcessedTime = processTimes[callback] or 0
-		local timeSinceLastProcessed = os.clock() - lastProcessedTime
+			ownerStreams = {}
+			self._rateLimitStreams[owner] = ownerStreams
+		end
 
-		if timeSinceLastProcessed >= rateLimitInterval then
-			processTimes[callback] = os.clock()
-			callback(...)
-		else
-			local needsCall = argCache[callback] == nil
-			argCache[callback] = args
-			if needsCall then
-				task.delay(rateLimitInterval - timeSinceLastProcessed, function()
-					local cachedArgs = argCache[callback]
-					if cachedArgs then
-						processTimes[callback] = os.clock()
-						argCache[callback] = nil
-						callback(table.unpack(cachedArgs))
-					end
-				end)
+		local callbackStreams = ownerStreams[callback]
+		if not callbackStreams then
+			callbackStreams = {}
+			ownerStreams[callback] = callbackStreams
+		end
+
+		local streamKey = if getRateLimitKey then getRateLimitKey(...) else nil
+		if streamKey == nil then
+			streamKey = DEFAULT_RATE_LIMIT_STREAM
+		end
+
+		-- A stream with nothing queued whose interval has passed behaves the
+		-- same as one never seen, so it is dropped. This keeps the table to the
+		-- keys in use rather than every key a client has ever sent.
+		for otherKey, otherStream in callbackStreams do
+			if
+				otherKey ~= streamKey
+				and not otherStream.PendingArgs
+				and now - otherStream.LastProcessedTime >= rateLimitInterval
+			then
+				callbackStreams[otherKey] = nil
 			end
 		end
+
+		local stream = callbackStreams[streamKey]
+		if not stream then
+			stream = { LastProcessedTime = -math.huge }
+			callbackStreams[streamKey] = stream
+		end
+
+		local timeSinceLastProcessed = now - stream.LastProcessedTime
+		if timeSinceLastProcessed >= rateLimitInterval then
+			stream.LastProcessedTime = now
+			callback(...)
+			return
+		end
+
+		-- Only the latest arguments are kept while a stream is waiting
+		local alreadyScheduled = stream.PendingArgs ~= nil
+		stream.PendingArgs = table.pack(...)
+		if alreadyScheduled then
+			return
+		end
+
+		task.delay(rateLimitInterval - timeSinceLastProcessed, function()
+			local pendingArgs = stream.PendingArgs
+			if not pendingArgs then
+				return
+			end
+
+			stream.PendingArgs = nil
+			stream.LastProcessedTime = os.clock()
+			callback(table.unpack(pendingArgs, 1, pendingArgs.n))
+		end)
 	end)
 end
 
@@ -327,19 +491,37 @@ end
 	`OnServerEvent` and `OnClientEvent` are aliases for this method.
 
 	@param callback function -- The callback to invoke when the event fires
+	`getRateLimitKey` receives the event's arguments and returns a key. Each key
+	is rate limited separately, so a remote whose payload names what it acts
+	on (a setting, an item) keeps the latest event for each name rather than
+	only the latest event overall.
+
+	```lua
+	SettingRemote:OnEvent(function(player, settingName, value)
+		-- ...
+	end, 0.5, function(player, settingName)
+		return settingName
+	end)
+	```
+
 	@param rateLimitInterval number? -- If provided, rate-limits the callback to this interval in seconds
-	@return RBXScriptConnection
+	@param getRateLimitKey RateLimitKeyGetter? -- If provided, rate-limits each key it returns separately
+	@return RemoteConnection -- A handle that disconnects the callback, safe to give to a Maid
 ]=]
-function Remote:OnEvent(callback: (...any) -> (), rateLimitInterval: number?)
-	task.spawn(function()
+function Remote:OnEvent(
+	callback: (...any) -> (),
+	rateLimitInterval: number?,
+	getRateLimitKey: RateLimitKeyGetter?
+): RemoteConnection
+	return connectDeferred(function()
 		if not RunService:IsRunning() then
-			return
+			return nil
 		end
 
 		local event = if IS_SERVER then self:_getEventServer().OnServerEvent else self:_getEventClient().OnClientEvent
 
 		return if rateLimitInterval
-			then self:_connectRateLimitedCallback(event, callback, rateLimitInterval)
+			then self:_connectRateLimitedCallback(event, callback, rateLimitInterval, getRateLimitKey)
 			else event:Connect(callback)
 	end)
 end
@@ -357,17 +539,28 @@ Remote.OnClientEvent = Remote.OnEvent
 	`OnServerUnreliableEvent` and `OnClientUnreliableEvent` are aliases for this method.
 
 	@param callback function -- The callback to invoke when the event fires
+	See [Remote:OnEvent] for `getRateLimitKey`.
+
 	@param rateLimitInterval number? -- If provided, rate-limits the callback to this interval in seconds
-	@return RBXScriptConnection
+	@param getRateLimitKey RateLimitKeyGetter? -- If provided, rate-limits each key it returns separately
+	@return RemoteConnection -- A handle that disconnects the callback, safe to give to a Maid
 ]=]
-function Remote:OnUnreliableEvent(callback: (...any) -> (), rateLimitInterval: number?)
-	task.spawn(function()
+function Remote:OnUnreliableEvent(
+	callback: (...any) -> (),
+	rateLimitInterval: number?,
+	getRateLimitKey: RateLimitKeyGetter?
+): RemoteConnection
+	return connectDeferred(function()
+		if not RunService:IsRunning() then
+			return nil
+		end
+
 		local event = if IS_SERVER
 			then self:_getUnreliableEventServer().OnServerEvent
 			else self:_getUnreliableEventClient().OnClientEvent
 
 		return if rateLimitInterval
-			then self:_connectRateLimitedCallback(event, callback, rateLimitInterval)
+			then self:_connectRateLimitedCallback(event, callback, rateLimitInterval, getRateLimitKey)
 			else event:Connect(callback)
 	end)
 end
@@ -501,15 +694,14 @@ Remote.FireAllClientsFast = Remote.FireAllClientsUnreliable
 	@param ... any -- The arguments to pass to the clients
 ]=]
 function Remote:FireAllExcept(excluded: Player | { Player }, ...)
-	if typeof(excluded) == "Instance" and excluded:IsA("Player") then
-		excluded = { excluded }
-	else
+	local excludedSet = toExcludedSet(excluded)
+	if not excludedSet then
 		warn(`Attempt to exclude non-Player from FireAllExcept ({tostring(excluded)})\n{debug.traceback()}`)
 		return
 	end
 
-	for _, player in pairs(Players:GetPlayers()) do
-		if not table.find(excluded, player) then
+	for _, player in Players:GetPlayers() do
+		if not excludedSet[player] then
 			self:FireClient(player, ...)
 		end
 	end
@@ -528,15 +720,14 @@ Remote.FireAllClientsExcept = Remote.FireAllExcept
 	@param ... any -- The arguments to pass to the clients
 ]=]
 function Remote:FireAllExceptUnreliable(excluded: Player | { Player }, ...)
-	if typeof(excluded) == "Instance" and excluded:IsA("Player") then
-		excluded = { excluded }
-	else
-		warn(`Attempt to exclude non-Player from FireAllExcept ({tostring(excluded)})\n{debug.traceback()}`)
+	local excludedSet = toExcludedSet(excluded)
+	if not excludedSet then
+		warn(`Attempt to exclude non-Player from FireAllExceptUnreliable ({tostring(excluded)})\n{debug.traceback()}`)
 		return
 	end
 
-	for _, player in pairs(Players:GetPlayers()) do
-		if not table.find(excluded, player) then
+	for _, player in Players:GetPlayers() do
+		if not excludedSet[player] then
 			self:FireClientUnreliable(player, ...)
 		end
 	end
@@ -626,6 +817,10 @@ Remote.FireFast = Remote.FireUnreliable
 ]=]
 function Remote:InvokeClient(player: Player, ...): any
 	assert(IS_SERVER, "InvokeClient can only be called on the server")
+	if not RunService:IsRunning() then
+		return nil
+	end
+
 	return self:_getFunctionServer():InvokeClient(player, ...)
 end
 
@@ -640,6 +835,10 @@ end
 ]=]
 function Remote:InvokeServer(...): any
 	assert(IS_CLIENT, "InvokeServer can only be called on the client")
+	if not RunService:IsRunning() then
+		return nil
+	end
+
 	return self:_getFunctionClient():InvokeServer(...)
 end
 
@@ -653,6 +852,10 @@ end
 	@yields
 ]=]
 function Remote:Invoke(...): any
+	if not RunService:IsRunning() then
+		return nil
+	end
+
 	if IS_SERVER then
 		local args = { ... }
 		local player = table.remove(args, 1)
@@ -701,6 +904,36 @@ end
 
 Remote.OnServerInvoke = Remote.OnInvoke
 Remote.OnClientInvoke = Remote.OnInvoke
+
+--[=[
+	Tears the remote down for good. It is removed from the registry, and on the
+	server its instances are destroyed, which disconnects every client's
+	listeners as well. Use this for remotes named after something that goes
+	away, such as a per-round or per-object remote, so they do not build up.
+
+	Any later call on this object does nothing. Calling `GetRemote` with the
+	same name afterwards creates a new remote.
+]=]
+function Remote:Destroy(): ()
+	if AllRemotes[self._name] == self then
+		AllRemotes[self._name] = nil
+	end
+
+	for _, connection in self._connections do
+		connection:Disconnect()
+	end
+
+	table.clear(self._connections)
+	table.clear(self._rateLimitStreams)
+
+	if IS_SERVER then
+		for _, instance in { self._event, self._unreliableEvent, self._function } do
+			instance:Destroy()
+		end
+	end
+
+	setmetatable(self, DestroyedRemote)
+end
 
 --[=[
 	@function GetRemote
