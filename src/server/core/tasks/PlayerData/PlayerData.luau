@@ -2,7 +2,7 @@
 
 	PlayerData.lua
 	ChiefWildin
-	Version: 2.5.0
+	Version: 2.6.0
 
 	Handles the implementation of ProfileService and ReplicaService for
 	managing player data.
@@ -26,6 +26,7 @@ local PlayerData = {}
 
 -- Dependencies
 
+local Environment = shared("Environment")
 local ProfileService = shared("ProfileService")
 local ProfileTemplate = shared("ProfileTemplate")
 local rcall = shared("rcall")
@@ -44,7 +45,8 @@ local INFINITE_YIELD_WARNING_TIME = 5
 -- How long a rejoining player's load waits for their previous session in this
 -- server to release its profile
 local PREVIOUS_SESSION_RELEASE_TIMEOUT = 15
-local STORE_NAME = if not RunService:IsStudio() and not workspace:GetAttribute("UseMockData")
+-- Every testing place and Studio session shares the testing store
+local STORE_NAME = if Environment.IsProduction() and not Environment.UsesMockData()
 	then "PlayerData_Prod"
 	else "PlayerData_Testing2"
 

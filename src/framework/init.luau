@@ -21,8 +21,14 @@ local Settings = require(script:WaitForChild("Settings")) ---@module Settings
 
 -- Setup
 
+local PlaceTypeEntry = Settings.PlaceTypes[game.PlaceId]
+local PlaceTypeConfig: Settings.PlaceTypeEntry = if typeof(PlaceTypeEntry) == "table"
+	then PlaceTypeEntry
+	else { Type = PlaceTypeEntry or "Generic" }
+
 local Order = {
-	PlaceType = Settings.PlaceTypes[game.PlaceId] or "Generic",
+	PlaceType = PlaceTypeConfig.Type,
+	Environment = PlaceTypeConfig.Environment or "Production",
 	Version = "3.1.0",
 }
 
@@ -65,6 +71,7 @@ end
 if RunService:IsServer() then
 	vprint("Version:", Order.Version)
 	vprint("PlaceType:", Order.PlaceType)
+	vprint("Environment:", Order.Environment)
 end
 vprint("Framework initializing...")
 
@@ -534,6 +541,9 @@ end
 shared.Assets = ReplicatedStorage:WaitForChild("Assets", 999)
 shared.new = Order.New
 shared.PlaceType = Order.PlaceType
+-- The environment set for this place in Settings.PlaceTypes. Use the
+-- Environment library to account for Studio and mock data as well.
+shared.Environment = Order.Environment
 -- The code groups loaded in this place, or nil when every group is loaded. Lets
 -- code check whether a system is present instead of checking place types.
 shared.CodeGroups = ActiveCodeGroups
