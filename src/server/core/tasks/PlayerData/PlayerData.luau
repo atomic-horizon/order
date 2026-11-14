@@ -2,9 +2,9 @@
 
 	PlayerData.lua
 	ChiefWildin
-	Version: 2.7.0
+	Version: 3.0.0
 
-	Handles the implementation of ProfileService and ReplicaService for
+	Handles the implementation of ProfileStore and ReplicaService for
 	managing player data.
 ]]
 
@@ -19,7 +19,7 @@ local RunService = game:GetService("RunService")
 --[=[
 	@class PlayerData
 
-	Provides an interface for managing player data using ProfileService and
+	Provides an interface for managing player data using ProfileStore and
 	ReplicaService.
 ]=]
 local PlayerData = {}
@@ -27,7 +27,7 @@ local PlayerData = {}
 -- Dependencies
 
 local Environment = shared("Environment")
-local ProfileService = shared("ProfileService")
+local ProfileStore = shared("ProfileStore")
 local ProfileTemplate = shared("ProfileTemplate")
 local rcall = shared("rcall")
 local ReplicaServiceListeners = shared("ReplicaServiceListeners")
@@ -42,6 +42,10 @@ type Replica = ReplicaServiceListeners.Replica
 local INFINITE_YIELD_WARNING_ENABLED = false
 -- How long to wait before warning about infinite yields on player data fetch
 local INFINITE_YIELD_WARNING_TIME = 5
+-- Attempts and seconds to wait for each one when RequestSave is called, since
+-- ProfileStore does not repeat a failed save on its own
+local REQUESTED_SAVE_ATTEMPTS = 3
+local REQUESTED_SAVE_TIMEOUT = 15
 -- How long a rejoining player's load waits for their previous session in this
 -- server to release its profile
 local PREVIOUS_SESSION_RELEASE_TIMEOUT = 15
@@ -61,7 +65,7 @@ local FailedPlayers: { [Player]: boolean } = {}
 local LoadedProfilesByUserId: { [number]: any } = {}
 local ProfileHolds: { [Player]: { [string]: number } } = {}
 local PlayerDataToken = ReplicaServiceListeners.NewClassToken("PlayerData")
-local ProfileStore
+local PlayerDataStore
 
 -- Objects
 
@@ -122,21 +126,30 @@ local function createUnsavedProfile(): any
 		Data = deepTableCopy(ProfileTemplate),
 		AddUserId = function() end,
 		Reconcile = function() end,
-		ListenToRelease = function()
-			return { Disconnect = function() end }
-		end,
+		OnSessionEnd = {
+			Connect = function()
+				return { Disconnect = function() end }
+			end,
+		},
 		IsActive = function()
 			return false
 		end,
 		Save = function() end,
-		Release = function() end,
+		EndSession = function() end,
 	}
 end
 
--- ProfileService's view mode loads a profile without a session lock, and its
--- Save and Release never write
+-- The store sessions and reads go through: the in-memory mock while
+-- UseMockData is on, otherwise the real store
+local function getActiveStore(): any
+	return if Environment.UsesMockData() then PlayerDataStore.Mock else PlayerDataStore
+end
+
+-- GetAsync loads a profile without a session lock, and the profile it returns
+-- never auto-saves or writes when its session ends
 local function loadReadOnlyProfile(userId: number): any?
-	local viewSucceeded, profile = pcall(ProfileStore.ViewProfileAsync, ProfileStore, tostring(userId))
+	local activeStore = getActiveStore()
+	local viewSucceeded, profile = pcall(activeStore.GetAsync, activeStore, tostring(userId))
 	if not viewSucceeded then
 		warn(`[PlayerData] Failed to load read-only data for {userId}: {profile}`)
 		return nil
@@ -146,7 +159,7 @@ local function loadReadOnlyProfile(userId: number): any?
 end
 
 -- A player who rejoins the same server quickly can arrive before the previous
--- session's profile is released, and ProfileService refuses to load a profile
+-- session's profile is released, and ProfileStore refuses to load a profile
 -- that is already loaded in this server
 local function waitForPreviousSessionRelease(userId: number): boolean
 	local waitStartTime = os.clock()
@@ -172,7 +185,7 @@ end
 local function setUpLoadedProfile(player: Player, profile: any): ()
 	profile:AddUserId(player.UserId)
 	profile:Reconcile()
-	profile:ListenToRelease(function()
+	profile.OnSessionEnd:Connect(function()
 		profileReleased(player, profile)
 	end)
 
@@ -202,14 +215,22 @@ local function processPlayer(player: Player)
 
 	local profile = if READ_ONLY_DATA
 		then loadReadOnlyProfile(player.UserId)
-		else ProfileStore:LoadProfileAsync(tostring(player.UserId), "ForceLoad")
-	if profile == nil then
-		failPlayerLoad(player)
+		else getActiveStore():StartSessionAsync(tostring(player.UserId), {
+			Cancel = function(): boolean
+				return not player:IsDescendantOf(Players)
+			end,
+		})
+
+	if not player:IsDescendantOf(Players) then
+		if profile then
+			profile:EndSession()
+		end
+
 		return
 	end
 
-	if not player:IsDescendantOf(Players) then
-		profile:Release()
+	if profile == nil then
+		failPlayerLoad(player)
 		return
 	end
 
@@ -218,7 +239,7 @@ local function processPlayer(player: Player)
 	local setupSucceeded, setupError = pcall(setUpLoadedProfile, player, profile)
 	if not setupSucceeded then
 		warn(`[PlayerData] Failed to set up data for {player}: {setupError}`)
-		profile:Release()
+		profile:EndSession()
 		failPlayerLoad(player)
 	end
 end
@@ -479,10 +500,10 @@ function PlayerData:WaitForData(player: Player): boolean
 end
 
 --[=[
-	Asks ProfileService to save the player's data at its next opportunity,
-	instead of waiting for the regular auto-save. Useful after an important
-	change such as a purchase. Does nothing if the player's profile is not
-	loaded.
+	Saves the player's data now instead of waiting for the regular auto-save,
+	retrying a few times if the save does not succeed. Useful after an
+	important change such as a purchase. Does nothing if the player's profile
+	is not loaded or data is read-only.
 
 	@param player Player -- The player whose data should be saved.
 	@return boolean -- Whether a save was requested.
@@ -493,7 +514,34 @@ function PlayerData:RequestSave(player: Player): boolean
 		return false
 	end
 
-	profile:Save()
+	task.spawn(function()
+		for _ = 1, REQUESTED_SAVE_ATTEMPTS do
+			if not profile:IsActive() then
+				return
+			end
+
+			local saveSucceeded = false
+			local saveConnection = profile.OnAfterSave:Connect(function()
+				saveSucceeded = true
+			end)
+
+			profile:Save()
+
+			local saveStartTime = os.clock()
+			while not saveSucceeded and os.clock() - saveStartTime < REQUESTED_SAVE_TIMEOUT do
+				task.wait(0.5)
+			end
+
+			saveConnection:Disconnect()
+
+			if saveSucceeded then
+				return
+			end
+		end
+
+		warn(`[PlayerData] Requested save for {player} did not succeed after {REQUESTED_SAVE_ATTEMPTS} attempts`)
+	end)
+
 	return true
 end
 
@@ -512,7 +560,8 @@ function PlayerData:ViewProfileAsync(userId: number): { [string]: any }?
 		return nil
 	end
 
-	local viewSucceeded, profile = pcall(ProfileStore.ViewProfileAsync, ProfileStore, tostring(userId))
+	local activeStore = getActiveStore()
+	local viewSucceeded, profile = pcall(activeStore.GetAsync, activeStore, tostring(userId))
 	if not viewSucceeded then
 		warn(`[PlayerData] Failed to view profile for {userId}: {profile}`)
 		return nil
@@ -528,7 +577,7 @@ end
 -- Task Initialization
 
 function PlayerData:Prep()
-	ProfileStore = ProfileService.GetProfileStore(STORE_NAME, ProfileTemplate)
+	PlayerDataStore = ProfileStore.New(STORE_NAME, ProfileTemplate)
 
 	if READ_ONLY_DATA then
 		warn(`[PlayerData] ReadOnlyData is on. Data loads from {STORE_NAME} and nothing is saved.`)
@@ -543,11 +592,11 @@ function PlayerData:Prep()
 
 			ProfileHolds[player] = nil
 
-			-- A read-only profile never fires its release listeners
+			-- A read-only profile never ends a session, so OnSessionEnd never fires
 			if READ_ONLY_DATA then
 				clearPlayerSession(player, profile)
 			else
-				profile:Release()
+				profile:EndSession()
 			end
 		else
 			PlayerCache[player] = nil
