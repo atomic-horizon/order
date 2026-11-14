@@ -1,9 +1,13 @@
 ---
 sidebar_position: 2
 title: Usage
+description: "Configure Order's settings, environments, packages and file structure, and load any module by name with shared() on the client and server."
+keywords: [order settings, shared, roblox module loading, luau tasks, code groups, environments]
 ---
 
 # Usage
+This page covers how to configure Order and how its module loading works: the framework settings, place environments, package folders, how tasks are found and initialized, and how to load any module with `shared()`.
+
 
 ## Settings
 The framework settings module (located at `src/framework/Settings.luau`) has a few different options that developers can customize for their projects.

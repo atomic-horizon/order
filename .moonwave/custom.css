@@ -1,0 +1,39 @@
+/* Site-wide styles. Moonwave adds this file to every page. */
+
+@import url("https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400;1,700&display=swap");
+
+:root {
+	--ifm-font-family-base: "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--ifm-heading-font-family: "Space Grotesk", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+	--ifm-font-family-monospace: "Space Mono", SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+/* Brand colors, matching the logo's red-orange. Light mode uses deeper shades so
+   links and primary text reach WCAG AA (4.5:1) on white; dark mode keeps the
+   brighter originals */
+:root {
+	--ifm-color-primary: #c8342a;
+	--ifm-color-primary-dark: #b42f26;
+	--ifm-color-primary-darker: #aa2c24;
+	--ifm-color-primary-darkest: #8c241d;
+	--ifm-color-primary-light: #d0453b;
+	--ifm-color-primary-lighter: #d6675f;
+	--ifm-color-primary-lightest: #e3928c;
+}
+
+[data-theme="dark"] {
+	--ifm-color-primary: #ff5c4d;
+	--ifm-color-primary-dark: #e04035;
+	--ifm-color-primary-darker: #d03a2f;
+	--ifm-color-primary-darkest: #a82520;
+	--ifm-color-primary-light: #ff7a62;
+	--ifm-color-primary-lighter: #ff8d78;
+	--ifm-color-primary-lightest: #ffb3a0;
+}
+
+/* The bundled Prism theme sets its own font on code blocks and loads after
+   this file, so these selectors need to be more specific than its own */
+:root pre[class*="language-"],
+:root code[class*="language-"] {
+	font-family: var(--ifm-font-family-monospace);
+}

@@ -4,9 +4,41 @@ changelog = true
 
 [docusaurus]
 onBrokenLinks = "warn"
-url = "https://atomic-horizon.github.io"
+url = "https://order.atomichorizon.net"
 baseUrl = "/"
 favicon = "/img/favicon.ico"
+tagline = "A lightweight Luau framework for structuring Roblox games"
+# GitHub Pages serves page.html at /page, so canonical URLs match the served
+# URL instead of redirecting to a trailing slash
+trailingSlash = false
+
+# Added to every page. Moonwave sets themeConfig itself, so site-wide social
+# preview tags go here instead of themeConfig.image
+[[docusaurus.headTags]]
+tagName = "meta"
+[docusaurus.headTags.attributes]
+property = "og:site_name"
+content = "Order"
+
+[[docusaurus.headTags]]
+tagName = "meta"
+[docusaurus.headTags.attributes]
+property = "og:image"
+content = "https://order.atomichorizon.net/img/embed_banner.png"
+
+[[docusaurus.headTags]]
+tagName = "meta"
+[docusaurus.headTags.attributes]
+name = "twitter:image"
+content = "https://order.atomichorizon.net/img/embed_banner.png"
+
+[[docusaurus.headTags]]
+tagName = "link"
+[docusaurus.headTags.attributes]
+rel = "alternate"
+type = "text/plain"
+title = "llms.txt"
+href = "https://order.atomichorizon.net/llms.txt"
 
 [home]
 enabled = true

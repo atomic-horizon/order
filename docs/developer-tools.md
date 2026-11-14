@@ -1,6 +1,8 @@
 ---
 sidebar_position: 4.5
 title: Developer Tools
+description: "Use Order's Cmdr console, Branches place switcher and PermissionService to control who can run developer tools in your Roblox game."
+keywords: [roblox admin commands, cmdr, permissions, developer tools]
 ---
 
 # Developer Tools

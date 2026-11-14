@@ -1,6 +1,8 @@
 ---
 sidebar_position: 1
 title: Getting Started
+description: "Install Order, the open-source Luau framework for Roblox games, create a project from the template, and write your first task."
+keywords: [roblox framework, luau, rojo, forest, wally, module loader, getting started]
 ---
 
 import Tabs from "@theme/Tabs";
@@ -8,6 +10,8 @@ import TabItem from "@theme/TabItem";
 import Link from "@docusaurus/Link";
 
 # Getting Started
+Order is a free, open-source Luau framework for Roblox games. It loads any module by name with `shared()`, starts every task in a predictable order on the client and the server, and includes player data, networking, UI and developer tools.
+
 To get started working with Order, you can use any of the options detailed below. Be sure to check out [the API](/api) for details on how everything works!
 
 ---

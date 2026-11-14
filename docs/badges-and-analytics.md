@@ -1,9 +1,13 @@
 ---
 sidebar_position: 4.6
 title: Badges and Analytics
+description: "Award Roblox badges reliably with Order's BadgeGiver queue, and set up Gamebeast analytics with an experience secret."
+keywords: [roblox badges, badgeservice, gamebeast, roblox analytics]
 ---
 
 # Badges and Analytics
+Order awards badges through a queue that stays within Roblox's BadgeService limits and retries failed awards, and it sets up the Gamebeast analytics SDK when your experience has a Gamebeast key.
+
 
 ## Badges
 

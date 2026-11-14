@@ -1,6 +1,8 @@
 ---
 sidebar_position: 3
 title: AtomicUI
+description: "Build animated Roblox UI with AtomicUI: AtomicPane, AtomicButton, ScreenGui and UIStateManager for showing and hiding panes by state."
+keywords: [roblox ui framework, atomicui, luau ui, ui state manager]
 ---
 
 # Working with AtomicUI

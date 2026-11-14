@@ -1,0 +1,1570 @@
+# Order
+
+> Order is a free, open-source (MIT) Luau framework for Roblox games. It loads any module by name with `shared()`, starts every task in a predictable order on the client and the server, and includes player data, networking, UI and developer tools.
+
+This file contains every page of the Order docs (https://order.atomichorizon.net). The API reference is at https://order.atomichorizon.net/api.
+
+<!-- https://order.atomichorizon.net/docs/intro -->
+> Install Order, the open-source Luau framework for Roblox games, create a project from the template, and write your first task.
+
+# Getting Started
+Order is a free, open-source Luau framework for Roblox games. It loads any module by name with `shared()`, starts every task in a predictable order on the client and the server, and includes player data, networking, UI and developer tools.
+
+To get started working with Order, you can use any of the options detailed below. Be sure to check out [the API](https://order.atomichorizon.net/api) for details on how everything works!
+
+---
+
+## Installation
+
+**Rojo:**
+
+### 1) Download VS Code and Rojo
+1. Download and install VS Code from [here](https://code.visualstudio.com/)
+2. From VS Code, install the extension Rojo from the Extensions tab on the left sidebar or through [this link.](https://marketplace.visualstudio.com/items?itemName=evaera.vscode-rojo)
+3. In Roblox Studio, search for and add the plugin for Rojo through the toolbox, or use [this link.](https://create.roblox.com/store/asset/13916111004/Rojo)
+
+### 2) Create a new repository based on this template
+1. At the top of this page, click the green "Use this template" button and select "Create a new repository"
+2. Select the proper owner, add a name, choose your desired visiblity options, and click "Create repository from template"
+3. Using the software of your choice (I typically use VS Code's Source Control menu), clone your new repository to your computer
+
+### 3) Install packages
+Order supports two package managers. [Forest](https://docs.forest.dev/) is recommended, and Wally is still supported.
+
+**Forest (recommended):**
+
+1. Install [Rokit](https://github.com/rojo-rbx/rokit), then run `rokit install` in your project's directory. This installs Rojo, StyLua and the Forest CLI at the versions listed in `rokit.toml`.
+2. Run `forest install`. Forest reads `forest.json`, installs shared packages into `Packages` and server-only packages into `ServerPackages`.
+3. Commit `forest-lock.json` whenever it changes, so every machine installs the same versions.
+
+**Wally:**
+
+1. If you don't yet have Wally, you can install it [from here](https://github.com/UpliftGames/wally), or through Rokit or Aftman.
+2. Run `wally install` in your project's directory to get the packages in `wally.toml`.
+
+:::tip
+Use one package manager per project. Forest removes Wally's `_Index` folders the next time it installs, and `forest init --project` converts an existing `wally.toml` into a `forest.json`.
+:::
+
+### 4) Project configuration
+1. Open the new repository in VS Code and then open the `default.project.json` file
+2. At the top, you'll see a string that reads "New Order Project", replace this with the name of your new project and save the file
+
+### 5) Sync code into Roblox Studio
+1. In VS Code, click the Rojo button on the bottom right (if you don't see this icon, verify the Rojo extension is installed and restart VS Code)
+2. In the context menu that appears, click on `default.project.json` at the bottom
+3. In Roblox Studio, create or open a place file that will host your new experience
+4. Switch to the Plugins tab, and select Rojo
+5. In the Rojo window that appears, click "Connect"
+
+You are now up and running with Order! Any code you write in VS Code will be synced into your new game whenever you save the file.
+
+**Roblox Package:**
+
+I highly recommend the professional environment that Rojo offers, but if you'd like, you can also get Order directly from the Roblox catalog [here](https://www.roblox.com/library/11152308855/). Installation instructions are included with the package. Note that this package follows a different setup structure and has to be updated manually, so updates come a lot slower to this version and it may often be out of date.
+
+---
+## Creating your first task
+
+Tasks are the primary way to run code at runtime in Order. Any module placed inside a `tasks` folder will be automatically discovered and initialized by the framework.
+
+### 1) Create the task file
+Inside the appropriate context folder (`client`, `server`, or `shared`), create a `tasks` subfolder if one doesn't already exist, then add a new `.luau` file inside it. For example, to create a server-side task:
+
+```
+src/
+  server/
+    core/
+      tasks/
+        MyTask.luau   ← your new task
+```
+
+### 2) Write the task module
+
+A task is a regular Lua table returned by the module. Add `:Prep()` for synchronous setup that runs before everything else, and `:Init()` for your main async logic that runs after all prep work is done. Both are optional.
+
+```lua
+local PlayerUtils = shared("PlayerUtils")
+
+local MyTask = {
+    Priority = 0, -- optional, higher values initialize first
+}
+
+function MyTask:Prep()
+    -- Synchronous setup — runs before :Init() on any task.
+    -- Safe to set up state here, but avoid yielding.
+    self.Players = {}
+end
+
+function MyTask:Init()
+    -- Async runtime logic — runs after all :Prep() calls finish.
+    PlayerUtils:PlayerAdded(function(player)
+		...
+	end)
+    print("MyTask initialized!")
+end
+
+return MyTask
+```
+
+### 3) Load other modules from your task
+
+Call `shared()` at the top of the file, before defining the task table, to load dependencies by name, partial path, or direct reference:
+
+```lua
+local PlayerData = shared("PlayerData")
+local GetRemote   = shared("GetRemote")
+
+local MyTask = {}
+
+function MyTask:Init()
+    GetRemote("Counter"):OnEvent(function(player)
+        PlayerData:IncrementNumValue(player, "Counter", 1)
+    end)
+end
+
+return MyTask
+```
+
+For modules involved in a **cyclic dependency**, you can still call `shared()` at the top level — but any code that actually *uses* the returned value must be inside a function:
+
+```lua
+local CyclicModule = shared("CyclicModule") -- fine at the top level
+
+local MyTask = {}
+
+function MyTask:Init()
+    CyclicModule:DoThing() -- safe: accessed inside a function, not bare code
+end
+
+return MyTask
+```
+
+:::warning
+Bare top-level code that directly calls or indexes a cyclic dependency will not work. Order detects this and will skip initialization on that module with a warning.
+:::
+
+Once the framework initializes, your task will be picked up automatically — no registration or additional wiring needed.
+
+---
+
+<!-- https://order.atomichorizon.net/docs/usage -->
+> Configure Order's settings, environments, packages and file structure, and load any module by name with shared() on the client and server.
+
+# Usage
+This page covers how to configure Order and how its module loading works: the framework settings, place environments, package folders, how tasks are found and initialized, and how to load any module with `shared()`.
+
+## Settings
+The framework settings module (located at `src/framework/Settings.luau`) has a few different options that developers can customize for their projects.
+
+| Setting | Description |
+| --- | --- |
+| `Debug.CyclicAnalysis` | When `true`, tracks cyclic dependency chains across the project and prints an analysis after initialization completes. |
+| `Debug.VerboseLoading` | When `true`, prints detailed information during initialization: discovered modules, the resolved load order, and when each module finishes. |
+| `SilentMode` | When `true`, suppresses all regular output (version info, initialization notices, etc.). Warnings are never suppressed. Defaults to `false` in Studio and `true` in production. |
+| `InitOrder` | `"Project"` runs each initializer across all tasks before moving to the next. `"Individual"` runs all initializers on each task before moving to the next task. Both modes respect priority values. |
+| `InitFunctionConfig` | A table defining the initialization functions for the project and their options (name, async, protected, warn delay). |
+| `PlaceTypes` | Maps Place IDs to a place type string, or to a table that also sets the place's environment (see [Environments](#environments)). Unrecognized places default to `"Generic"`. The active type is accessible at runtime via `shared.PlaceType`. |
+| `CodeGroups` | Maps place type names to the set of code group root directories that should be active for that type. Enables selectively sharing modules across different server types (e.g. lobby vs. game server). |
+
+## Environments
+Each place runs in either the `"Production"` or `"Testing"` environment. Set it with the table form of a `PlaceTypes` entry:
+
+```lua
+PlaceTypes = {
+    [123456789] = "Lobby", -- Production
+    [987654321] = { Type = "Lobby", Environment = "Testing" },
+},
+```
+
+Places with no environment, and places that aren't listed, are `"Production"`. The configured value is available as `shared.Environment`. Use the `Environment` library to also account for Studio:
+
+```lua
+local Environment = shared("Environment")
+
+if Environment.IsProduction() then
+    -- A live server of a production place
+end
+```
+
+| Function | Returns |
+| --- | --- |
+| `Environment.GetName()` | The environment set in `PlaceTypes`. |
+| `Environment.IsProduction()` | `true` in live servers of production places. `false` in Studio and testing places. |
+| `Environment.IsTesting()` | The opposite of `IsProduction()`. |
+| `Environment.UsesMockData()` | Whether the `UseMockData` attribute is on (see [Player Data](https://order.atomichorizon.net/docs/player-data#data-stores-and-testing)). |
+| `Environment.UsesReadOnlyData()` | Whether the `ReadOnlyData` attribute is on (see [Player Data](https://order.atomichorizon.net/docs/player-data#data-stores-and-testing)). |
+
+`PlayerData` uses the environment to pick its data store. See [Player Data](https://order.atomichorizon.net/docs/player-data#data-stores-and-testing) for the stores and the testing attributes.
+
+## Packages
+Packages install into two folders:
+
+- `Packages` maps to `ReplicatedStorage.Packages` and is available on both the server and the client.
+- `ServerPackages` maps to `ServerScriptService.ServerPackages` and is never replicated, so clients can't see its source. Cmdr and ProfileStore install here.
+
+Order indexes both folders, so packages load by their alias like any other module:
+
+```lua
+local ProfileStore = shared("ProfileStore")
+```
+
+:::note
+`default.project.json` skips `.server` and `.client` scripts inside both package folders. Some packages ship test scripts, and Rojo gives them a `RunContext`, which makes them run wherever they are placed.
+:::
+
+## File structure
+
+### Tasks
+Tasks are modules that have code intended for immediate execution at runtime. Tasks should be placed in the `tasks` folder of the appropriate context.
+:::info
+    Any module that is placed inside the `tasks` folder will be loaded by default, even if no initialization function exists within it or if it isn't even a table. All other modules are loaded only as requested.
+:::
+#### Priorities
+If you wish to give a task priority during the initialization phase, set a `Priority` key in the main module table to the priority level you would like (higher values load first, negative values load last). Setting a priority is optional - if you don't set one, the task will be set to priority 0 by default.
+:::warning
+    Tasks with priorities are still initialized asynchronously, so if the task yields during initialization there is no guarantee that it will finish before a lower priority task starts initializing. Tasks with the same priority are initialized in an arbitrary order.
+:::
+#### Initialization functions and synchronization
+In the default configuration, tasks can place their code to execute into two initialization functions: `:Prep()` and `:Init()`. `:Prep()` comes first and is synchronous, and then `:Init()` comes after and is asynchronous. Tasks are not required to have either, and are allowed to define their own initialization functions if desired. These can be defined by placing a table called `InitConfigOverride` in the module table, following the same structure as is found for `InitFunctionConfig` in the `Settings.luau` file of the framework folder.
+
+#### Example
+```lua
+local NewTask = {
+    Priority = 5,
+}
+
+function NewTask:Prep()
+    print("Task is prepped.")
+end
+
+function NewTask:Init()
+	print("Task is running!")
+end
+
+return NewTask
+```
+
+### Everything else
+All other modules can be placed in the provided `lib` folder, or any other custom folders that you create.
+
+### File paths
+There are five top-level directories by default:
+
+- `character` - StarterPlayer.StarterCharacterScripts
+- `client` - StarterPlayer.StarterPlayerScripts
+- `first` - ReplicatedFirst
+- `server` - ServerScriptService
+- `shared` - ReplicatedStorage.Shared
+
+:::note
+    `first` and `character` are not scanned for task modules, as it is assumed that developers will simply use LocalScripts/Scripts instead. If you wish to add tasks there, you may add custom support at the end of the main framework module. For Rojo users, further file path customization can be configured in the `default.project.json` file.
+:::
+
+## Loading dependencies
+Order makes use of the `shared` global variable to load dependencies. In code, this takes the place of the usual `require` keyword. This function can take either a string of the module's name, a string of a partial or complete path to the module, or a direct object reference to a ModuleScript.
+Valid examples:
+```lua
+local GetRemote = shared("GetRemote")
+```
+```lua
+local GetRemote = shared("lib/GetRemote")
+```
+```lua
+local GetRemote = shared(game:GetService("ReplicatedStorage").Shared.core.lib.GetRemote)
+```
+:::warning
+    When two or more modules exist with the same name or partial path, Order will warn you that it found multiple modules for your request, and will ask you to be more specific. You can use any level of the module paths it provides you with, as long as it is unique.
+:::
+
+The Order module itself can also be used instead of `shared` if you have other uses for that keyword, want to avoid globals like the plague, or are running in portable mode. For example:
+```lua
+local require = require(game:GetService("ReplicatedStorage").Order)
+```
+
+### Supporting modules from other frameworks
+If you would like to import a module from another framework that uses `require` to load dependencies (such as Nevermore), simply redirect `require` to `shared`:
+```lua
+local require = shared
+```
+Or, alternatively, you can redirect their require call to the main Order module:
+```lua
+local require = require(game:GetService("ReplicatedStorage").Order)
+```
+Also be sure to update your initializer configuration to support the module's intended initialization procedure (or adapt it to Order's, if preferred.)
+
+---
+
+<!-- https://order.atomichorizon.net/docs/player-data -->
+> Save and replicate Roblox player data in Order with ProfileStore and ReplicaService, and read it on the client with DataController.
+
+# Player Data
+
+Order saves each player's data with [ProfileStore](https://madstudioroblox.github.io/ProfileStore/) and replicates it to that player's client with [ReplicaService](https://madstudioroblox.github.io/ReplicaService/). The server reads and writes data through the `PlayerData` service. The client gets a read-only copy through `DataController`, which updates as the server changes it.
+
+## The profile template
+
+`ProfileTemplate` (`src/shared/core/lib/PlayerData/ProfileTemplate.luau`) is the shape and starting value of every player's data. Add the keys your game needs:
+
+```lua
+local ProfileTemplate = {
+    AwardedBadges = {},
+    PendingBadges = {},
+
+    Coins = 0,
+    Settings = {
+        MusicVolume = 0.5,
+    },
+}
+```
+
+- New players start with a copy of the template.
+- When a returning player loads, keys added to the template since they last played are filled in with their template values. Keys removed from the template stay in saved data until you clear them.
+- The template is frozen, so code can't change it by accident.
+- `AwardedBadges` and `PendingBadges` are used by `BadgeGiver`. Keep them.
+
+Because the template is shared, the client can read it too. In Edit mode, where no server is running, `DataController` returns the template so UI previews have data to show.
+
+## Loading
+
+Data loads automatically when a player joins. Wait for it before using it:
+
+```lua
+local PlayerData = shared("PlayerData")
+
+Players.PlayerAdded:Connect(function(player)
+    if not PlayerData:WaitForData(player) then
+        return -- The player left, or their data failed to load
+    end
+
+    print(PlayerData:GetValue(player, "Coins"))
+end)
+```
+
+`WaitForData` returns `false` if the player leaves or their data can't load. In a live server, a player whose data can't load is kicked with a message to try again. Studio doesn't kick, so you can still test.
+
+A profile can only be loaded in one server at a time. When a player rejoins the same server quickly, their new load waits up to 15 seconds for the previous session to finish saving.
+
+## Reading and writing on the server
+
+Every function that takes a key path accepts a single key, a dot-separated path, or an array of keys:
+
+```lua
+PlayerData:GetValue(player, "Coins")
+PlayerData:GetValue(player, "Settings.MusicVolume")
+PlayerData:GetValue(player, { "Settings", "MusicVolume" })
+```
+
+| Function | Use |
+| --- | --- |
+| `GetValue(player, keyPath)` | Returns the value at the path, or `nil` if the last key is missing. Every table before the last key must exist, or it errors. |
+| `SetValue(player, keyPath, value)` | Sets the value and replicates it to the player. |
+| `IncrementNumValue(player, keyPath, amount)` | Adds a non-zero amount to a number (a missing value counts as `0`) and returns the new value. Returns `nil` if the amount is `0` or the stored value isn't a number. |
+| `Observe(player, keyPath, callback)` | Calls `callback(newValue, oldValue)` with the current value right away, then on every change. Returns a connection. |
+| `SetValueCallback(player, keyPath, callback, runImmediately?)` | Like `Observe`, but only calls back for the current value when `runImmediately` is `true`. |
+| `GetPlayerDataReplica(player)` | Returns the player's `Replica`. Yields until data loads, and returns `nil` if the player leaves or their data can't load. |
+
+Each of these yields until the player's data loads. If the data can't load, they warn and return `nil` instead of acting. There's no warning if the player has already left.
+
+:::caution
+Never change tables from `GetValue` in place. The change isn't replicated, and the client's copy goes out of date. For a single value, use `SetValue`. For arrays, use the replica's methods, such as `ArrayInsert` and `ArrayRemove` (see the [Replica API](https://madstudioroblox.github.io/ReplicaService/api/#replica)):
+
+```lua
+local replica = PlayerData:GetPlayerDataReplica(player)
+replica:ArrayInsert("OwnedItems", "Sword")
+```
+:::
+
+## Reading on the client
+
+`DataController` mirrors the reading half of the server API, without the `player` argument:
+
+```lua
+local DataController = shared("DataController")
+
+local coinsConnection = DataController:Observe("Coins", function(coins)
+    CoinsLabel.Text = `{coins}`
+end)
+```
+
+| Function | Use |
+| --- | --- |
+| `GetValue(keyPath)` | Returns the value at the path, or `nil` if any part of the path is missing. Yields until data arrives. |
+| `Observe(keyPath, callback)` | Calls back with the current value right away, then on every change. Returns a connection. |
+| `SetValueCallback(keyPath, callback, runImmediately?)` | Like `Observe`, but only calls back for the current value when `runImmediately` is `true`. |
+| `GetData()` | Returns the whole data table. Yields until data arrives. |
+| `GetDataReplica()` | Returns the `Replica`. Yields until it arrives. |
+
+Client data is read-only. To change data, send a request to the server with a remote and validate it there.
+
+## Saving
+
+ProfileStore saves each profile every few minutes and when the player leaves. To save sooner, for example after a purchase, call `RequestSave`:
+
+```lua
+PlayerData:IncrementNumValue(player, "Coins", 500)
+PlayerData:RequestSave(player)
+```
+
+`RequestSave` returns right away. It retries up to 3 times in the background and warns if every attempt fails. It returns `false` when there's nothing to save, such as when the player has left or data is read-only.
+
+### Profile holds
+
+When a player leaves, their profile is saved and released. If you have async work that still needs to write to their data, such as a purchase being processed, hold the profile until it finishes:
+
+```lua
+local holdId = PlayerData:CreateProfileHold(player)
+
+-- Async work that writes to the player's data
+
+PlayerData:ReleaseProfileHold(holdId)
+```
+
+`CreateProfileHold` returns `nil` if the player's profile isn't loaded, so create the hold before the work starts. When the player leaves, the release waits up to about 10 seconds for holds to clear, then releases the profile anyway.
+
+## Reading another player's data
+
+`ViewProfileAsync(userId)` returns a copy of any user's saved data, including users who aren't in the server. It returns `nil` if they have nothing saved or the read fails. It doesn't lock the profile, so it won't disturb a session they have in another server. Changes to the copy aren't saved.
+
+```lua
+local savedData = PlayerData:ViewProfileAsync(userId)
+if savedData then
+    print(savedData.Coins)
+end
+```
+
+## Data stores and testing
+
+Production places save to the `PlayerData_Prod` store. Testing places and Studio share one testing store, so testing never touches real player data. See [Environments](https://order.atomichorizon.net/docs/usage#environments) to set a place's environment.
+
+Two attributes on `workspace` change how data is handled while testing:
+
+| Attribute | Effect |
+| --- | --- |
+| `UseMockData` | Uses an in-memory store that is discarded when the server closes. |
+| `ReadOnlyData` | Loads each player's saved data without locking it, and never writes it back. Every session starts from the same saved state. A player with nothing saved starts from the template. |
+
+:::caution
+Both attributes are ignored in live servers of production places, and the server warns once if either is set. A place published with one left on still loads and saves real player data.
+:::
+
+---
+
+<!-- https://order.atomichorizon.net/docs/atomicui -->
+> Build animated Roblox UI with AtomicUI: AtomicPane, AtomicButton, ScreenGui and UIStateManager for showing and hiding panes by state.
+
+# Working with AtomicUI
+
+AtomicUI is the UI framework used throughout the project. It is built around four modules:
+
+- **[AtomicPane](https://order.atomichorizon.net/api/AtomicPane)** — The base class for all UI components. Provides visibility animation, spring management, and automatic transparency interpolation.
+- **[AtomicButton](https://order.atomichorizon.net/api/AtomicButton)** — Extends `AtomicPane` with interactive states (hover, press, selected, enabled) and corresponding events.
+- **[ScreenGui](https://order.atomichorizon.net/api/ScreenGui)** — A small utility for creating `ScreenGui` instances with sensible defaults.
+- **[UIStateManager](https://order.atomichorizon.net/api/UIStateManager)** — Manages which registered UI components are visible based on named application states.
+
+GUI template instances are stored under `ReplicatedStorage.GuiTemplates`. The included `/amodule` snippet can be used to create new template asset modules.
+
+---
+
+## Creating a ScreenGui
+
+Use `ScreenGui.new` to create a container for your UI. It automatically parents to `PlayerGui` at runtime and to `CoreGui` in story environments.
+
+```lua
+local ScreenGui = shared("ScreenGui") ---@module ScreenGui
+
+local MyGui = ScreenGui.new("MyGui")
+```
+
+---
+
+## Creating an AtomicPane
+
+Subclass `AtomicPane` to build a custom UI component. Override `_draw` to update your elements each frame based on spring values.
+
+```lua
+local AtomicPane = shared("AtomicPane") ---@module AtomicPane
+
+local MyPane = setmetatable({}, AtomicPane)
+MyPane.__index = MyPane
+MyPane.ClassName = "MyPane"
+
+function MyPane:_draw()
+    local alpha = self._springs.Alpha.Position
+    self.Gui.Visible = alpha < 0.999
+    self.Gui.GroupTransparency = alpha
+end
+
+function MyPane.new(parent: Instance)
+    local self = setmetatable(AtomicPane.new("MyPaneTemplate", {
+        TitleLabel = "Title",
+    }), MyPane)
+
+    self:SetVisible(false, true) -- start hidden, no animation
+
+    self.Gui.Parent = parent
+
+    return self
+end
+
+return MyPane
+```
+
+The string key passed to `AtomicPane.new` must match the name of a `GuiObject` in `ReplicatedStorage.GuiTemplates`. The second argument maps descendant instance names to keys on `self` for quick access.
+
+### Automatic alpha mapping
+
+Instead of manually interpolating transparencies in `_draw`, call `MapAlpha` on any element whose transparency properties should be driven by the `Alpha` spring automatically:
+
+```lua
+function MyPane.new(parent: Instance)
+    local self = setmetatable(AtomicPane.new("MyPaneTemplate", {}), MyPane)
+
+    self:MapAlpha(self.Gui) -- maps all descendants recursively
+
+    self:SetVisible(false, true)
+    self.Gui.Parent = parent
+
+    return self
+end
+```
+
+`MapAlpha` caches each element's current transparencies as its fully visible values, so map elements while they look the way they should when visible. Mapped values are drawn at the pane's current alpha as soon as they are mapped.
+
+Pass a list of instances as the second argument to skip their subtrees, for example nested components that animate their own transparency:
+
+```lua
+self:MapAlpha(self.Gui, { self.LoadingSpinner })
+```
+
+To change mapping after the fact:
+
+- `UnmapAlpha(element)` stops driving an element and its descendants, and leaves their transparencies as they are.
+- `SetMappedAlpha(element, property, visibleAlpha)` changes the value one property shows when the pane is fully visible, for elements whose resting look changes after they were mapped.
+
+### Custom springs
+
+Add extra springs for animations beyond visibility:
+
+```lua
+function MyPane.new(parent: Instance)
+    local self = setmetatable(AtomicPane.new("MyPaneTemplate", {}), MyPane)
+
+    self:AddSpring("Slide", { s = 35, d = 1, i = 0 })
+
+    self:SetVisible(false, true)
+    self.Gui.Parent = parent
+
+    return self
+end
+
+function MyPane:_draw()
+    local alpha = self._springs.Alpha.Position
+    local slide = self._springs.Slide.Position
+
+    self.Gui.Visible = alpha < 0.999
+    self.Gui.Position = UDim2.new(slide * -0.5, 0, 0.5, 0)
+end
+```
+
+---
+
+## Creating an AtomicButton
+
+Subclass `AtomicButton` the same way as `AtomicPane`. It adds `Hovered`, `Pressed`, `Selected`, and `Enabled` springs automatically, along with the corresponding signals and setter methods.
+
+```lua
+local AtomicButton = shared("AtomicButton") ---@module AtomicButton
+
+local MyButton = setmetatable({}, AtomicButton)
+MyButton.__index = MyButton
+MyButton.ClassName = "MyButton"
+
+function MyButton:_draw()
+    local alpha   = self._springs.Alpha.Position
+    local hovered = self._springs.Hovered.Position
+    local pressed = self._springs.Pressed.Position
+
+    self.Gui.Visible = alpha < 0.999
+
+    -- Subtle scale feedback
+    local scale = 1 - pressed * 0.04 + hovered * 0.02
+    self.Gui.Size = UDim2.fromScale(scale, scale)
+end
+
+function MyButton.new(parent: Instance)
+    local self = setmetatable(AtomicButton.new("MyButtonTemplate", {}), MyButton)
+
+    self.Activated:Connect(function()
+        print("Button clicked!")
+    end)
+
+    self:SetVisible(false, true)
+    self.Gui.Parent = parent
+
+    return self
+end
+
+return MyButton
+```
+
+:::note
+`AtomicButton` automatically creates a transparent `TextButton` named `Sensor` as a child of `Gui` if one does not already exist. You do not need to add one manually. `GetSensor()` returns it, which is useful for gamepad navigation since selection lands on the sensor rather than the pane's `Gui`.
+:::
+
+---
+
+## Linking panes
+
+Use `AtomicPane:Link` to tie the lifetime (and optionally visibility) of a child pane to a parent pane. When the parent is destroyed, the linked child is cleaned up automatically.
+
+```lua
+local childPane = MyChildPane.new()
+childPane:Link(parentPane)
+
+-- Also mirror visibility changes:
+childPane:Link(parentPane, true)
+```
+
+---
+
+## Using UIStateManager
+
+`UIStateManager` allows you to define named application states that show and hide groups of registered UI components together.
+
+### Registering a component
+
+Call `RegisterComponent` with a unique name and the pane instance. The component must implement `:Show()` and `:Hide()`, which all `AtomicPane` subclasses provide.
+
+```lua
+local UIStateManager = shared("UIStateManager") ---@module UIStateManager
+
+UIStateManager:RegisterComponent("HUD", myHudPane)
+UIStateManager:RegisterComponent("PauseMenu", myPausePane)
+```
+
+### Registering states
+
+Define states with `RegisterState`, specifying which components to show and hide:
+
+```lua
+UIStateManager:RegisterState("Gameplay", {
+    Shows = { "HUD" },
+    Hides = { "PauseMenu" },
+    CoreGui = {
+        Shows = { "*" },
+        Hides = {},
+    },
+    GamepadCursorEnabled = false,
+})
+
+UIStateManager:RegisterState("Paused", {
+    Shows = { "PauseMenu" },
+    Hides = { "HUD" },
+    GamepadCursorEnabled = true,
+})
+```
+
+Use `"*"` in `Shows` or `Hides` to target all registered components at once.
+
+### Switching states
+
+```lua
+UIStateManager:SetState("Paused")
+
+-- Restore the previous state
+UIStateManager:PreviousState()
+
+-- Return to the default state
+UIStateManager:SetDefault()
+```
+
+### Blocking transitions
+
+Add a `Blocks` list to a state's properties to prevent certain transitions while that state is active:
+
+```lua
+UIStateManager:RegisterState("Cutscene", {
+    Shows = {},
+    Hides = { "*" },
+    Blocks = { "*" }, -- prevent all state changes
+})
+```
+
+Pass `true` as the second argument to `SetState` to force a transition regardless of blocks:
+
+```lua
+UIStateManager:SetState("Gameplay", true)
+```
+
+### Reacting to state changes
+
+Use `RegisterEventHook` to run logic whenever the state changes:
+
+```lua
+UIStateManager:RegisterEventHook("StateChange", function(newState, oldState)
+    print("Transitioned from", oldState, "to", newState)
+end)
+```
+
+Available hooks: `StateChange`, `BeforeStateChange`, `AfterStateChange`, `CoreGuiChange`.
+
+---
+
+<!-- https://order.atomichorizon.net/docs/statemanager -->
+> Track named gameplay states in Roblox with Order's StateManager, with rules for which states block, end or start others.
+
+# StateManager
+
+`StateManager` tracks named states, such as `"Sprinting"` or `"InMenu"`, that can be on or off at the same time. Rules in a config decide which states block, end or start other states. Code can then ask "can the player sprint right now?" in one place instead of checking a list of flags.
+
+It is separate from [UIStateManager](https://order.atomichorizon.net/docs/atomicui#using-uistatemanager), which switches between one UI state at a time and shows and hides panes. The two don't depend on each other.
+
+## Defining states
+
+States are defined in `GlobalConfig` (`src/shared/core/lib/StateManager/Configs/GlobalConfig.luau`). Each key is a state name, and every rule is optional:
+
+```lua
+return {
+    Sprinting = {
+        BlockedBy = { "Stunned" },
+        Deactivates = { "Crouching" },
+        Tags = { "Movement" },
+    },
+    Crouching = {
+        BlockedBy = { "Stunned" },
+        Deactivates = { "Sprinting" },
+        Tags = { "Movement" },
+    },
+    Stunned = {
+        Deactivates = { "Sprinting", "Crouching" },
+    },
+    InMenu = {
+        Activates = { "MouseUnlocked" },
+    },
+    MouseUnlocked = {},
+} :: StateConfig
+```
+
+| Rule | Effect when the state is activated |
+| --- | --- |
+| `BlockedBy` | Fails if any of these states is active. |
+| `Deactivates` | Deactivates any of these states that are active. |
+| `Activates` | Also activates these states, following their own rules. |
+| `Tags` | Groups the state so it can be checked or changed with others. See [Tags](#tags). |
+
+The config also has a `Requires` rule, but it doesn't work yet: a state with `Requires` set can never be activated.
+
+`shared("StateManager")` returns one shared manager built from `GlobalConfig`. Every state the code refers to must be in the config. Activating a state that isn't there raises an error.
+
+## Activating and deactivating
+
+```lua
+local StateManager = shared("StateManager")
+
+local activated, blockingState = StateManager:ActivateState("Sprinting")
+if not activated then
+    print(`Can't sprint while {blockingState.Name} is active`)
+end
+
+StateManager:DeactivateState("Sprinting")
+StateManager:ToggleState("Crouching")
+```
+
+`ActivateState` returns `true` and the state if it is now active (or already was). It returns `false` and the active state that blocked it otherwise. States listed in `Deactivates` never block, they're turned off instead.
+
+| Function | Use |
+| --- | --- |
+| `ActivateState(name)` | Activates a state if its rules allow it. |
+| `DeactivateState(name)` | Deactivates a state. |
+| `ToggleState(name)` | Activates or deactivates a state, depending on whether it's active. |
+| `IsStateActive(name)` | Whether a state is active. Pass a list to check that all of them are active. |
+| `IsAnyStateActive(names)` | Whether any state in the list is active. |
+| `IsStateActivatable(name)` | Whether `ActivateState` would succeed right now, and the name of the blocking state if not. |
+| `GetState(name)` | Returns the `State` object. |
+| `GetActiveStates()` / `GetAllStates()` | Returns the active states or all states, keyed by name. These are the manager's own tables, so don't change them. |
+
+## Reacting to changes
+
+The manager has `StateActivated` and `StateDeactivated` signals, which fire with the state's name:
+
+```lua
+StateManager.StateActivated:Connect(function(stateName)
+    print(`{stateName} on`)
+end)
+```
+
+To react to one state, use its own signals, or bind a handler that runs on both activation and deactivation:
+
+```lua
+StateManager:GetStateActivatedSignal("InMenu"):Connect(function()
+    print("Menu opened")
+end)
+
+local sprinting = StateManager:GetState("Sprinting")
+sprinting:BindHandler(function(state)
+    humanoid.WalkSpeed = if state:IsActive() then 24 else 16
+end, "SprintSpeed")
+```
+
+| `State` member | Use |
+| --- | --- |
+| `Name` | The state's name. |
+| `IsActive()` | Whether the state is active. |
+| `Activated` / `Deactivated` | Signals for this state. |
+| `BindHandler(handler, handlerName?)` | Calls `handler(state)` on every activation and deactivation, in a new thread. Returns the handler's name, a generated one if you didn't pass one. |
+| `UnbindHandler(handlerName)` / `ClearHandlers()` | Removes one handler or all of them. |
+| `LastActivatedAt` / `LastDeactivatedAt` | `os.clock()` time of the last change. |
+
+## Tags
+
+Tags act on groups of states:
+
+```lua
+-- End all movement states except crouching
+StateManager:DeactivateStatesWithTagExcept("Movement", "Crouching")
+
+local activeMovementStates = StateManager:GetStatesActiveWithTag("Movement")
+```
+
+| Function | Use |
+| --- | --- |
+| `GetStatesActiveWithTag(tag)` | Returns the active states with the tag. |
+| `ActivateStatesWithTag(tag)` | Tries to activate every state with the tag. Returns whether any failed, then the activated and failed states. |
+| `ActivateStatesWithTagExcept(tag, names)` | The same, skipping one name or a list of names. Returns whether all succeeded, then the activated and failed states. |
+| `DeactivateStatesWithTag(tag)` | Deactivates every state with the tag. |
+| `DeactivateStatesWithTagExcept(tag, names)` | The same, skipping one name or a list of names. |
+
+:::caution
+The first value from `ActivateStatesWithTag` is `true` when something **failed**, but the first value from `ActivateStatesWithTagExcept` is `true` when everything **succeeded**.
+:::
+
+Using a tag that no state has warns and changes nothing.
+
+---
+
+<!-- https://order.atomichorizon.net/docs/networking -->
+> Send events and invoke functions between the Roblox client and server with GetRemote, including rate limits and unreliable events.
+
+# Networking with GetRemote
+
+All server-client communication is handled through the `GetRemote` module. It returns a [`Remote`](https://order.atomichorizon.net/api/Remote) object — a unified wrapper around `RemoteEvent`, `UnreliableRemoteEvent`, and `RemoteFunction` that automatically creates the underlying instances on demand and routes calls by context.
+
+You never need to manually create or locate remote instances in `ReplicatedStorage`. Just call `GetRemote` with a name from either side and use it.
+
+```lua
+local GetRemote = shared("GetRemote") ---@module GetRemote
+
+local MyRemote = GetRemote("MyRemote")
+```
+
+The same name resolves to the same `Remote` object throughout the session, so repeated calls with the same name are safe and return the same instance.
+
+---
+
+## Firing events
+
+### Server → Client
+
+```lua
+-- Fire to one player
+MyRemote:FireClient(player, "Hello!")
+
+-- Fire to a list of players
+MyRemote:FireClientList({ player1, player2 }, "Hello!")
+
+-- Fire to all players
+MyRemote:FireAllClients("Hello, everyone!")
+
+-- Fire to all players except one, or except a list of players
+MyRemote:FireAllExcept(player, "Everyone but you!")
+MyRemote:FireAllExcept({ player1, player2 }, "Everyone but you two!")
+```
+
+### Client → Server
+
+```lua
+MyRemote:FireServer("Hello, server!")
+```
+
+### Context-agnostic firing
+
+`:Fire()` routes automatically — it calls `:FireServer()` from the client or `:FireAllClients()` from the server:
+
+```lua
+MyRemote:Fire("Hello!")
+```
+
+---
+
+## Listening for events
+
+`:OnEvent()` also routes automatically — it connects to `OnServerEvent` on the server and `OnClientEvent` on the client. The server callback receives the firing player as the first argument.
+
+```lua
+-- Server
+MyRemote:OnEvent(function(player, message)
+    print(player.Name, "says:", message)
+end)
+
+-- Client
+MyRemote:OnEvent(function(message)
+    print("Server says:", message)
+end)
+```
+
+`OnServerEvent` and `OnClientEvent` are aliases for `:OnEvent()` and can be used for clarity.
+
+`:OnEvent()` returns a connection. Disconnect it, or give it to a `Maid`, when the listener should stop before the session ends:
+
+```lua
+self.Maid:GiveTask(MyRemote:OnEvent(function(message)
+    print(message)
+end))
+```
+
+### Rate limiting
+
+Pass a `rateLimitInterval` (in seconds) as the second argument to avoid processing bursts of events. Only the latest arguments received within the interval will be processed:
+
+```lua
+MyRemote:OnEvent(function(player, value)
+    -- processes at most once per 0.1 seconds per callback
+    updateHealthBar(value)
+end, 0.1)
+```
+
+:::caution
+Rate limiting drops intermediate events — only the most recent arguments within the interval are kept. Avoid this for events where every individual fire must be processed.
+:::
+
+By default, each player shares one rate limit for the callback. To limit separate streams independently, pass a function as the third argument that returns a key for each event. Events with different keys are limited separately:
+
+```lua
+-- Each unit a player controls is limited on its own
+MyRemote:OnEvent(function(player, unitId, position)
+    moveUnit(player, unitId, position)
+end, 0.1, function(player, unitId)
+    return unitId
+end)
+```
+
+---
+
+## Unreliable events
+
+For high-frequency data where occasional packet loss is acceptable (e.g. position updates, visual effects), use the unreliable variants. These use `UnreliableRemoteEvent` under the hood and have lower overhead.
+
+```lua
+-- Server → Client
+MyRemote:FireClientUnreliable(player, position)
+MyRemote:FireAllClientsUnreliable(position)
+
+-- Client → Server
+MyRemote:FireServerUnreliable(position)
+
+-- Context-agnostic
+MyRemote:FireUnreliable(position)
+
+-- Listening
+MyRemote:OnUnreliableEvent(function(player, position)
+    updateMarker(player, position)
+end)
+```
+
+`FireClientFast`, `FireServerFast`, `FireFast`, and `OnServerUnreliableEvent`/`OnClientUnreliableEvent` are all aliases for their unreliable counterparts.
+
+---
+
+## Remote functions (invoke/callback)
+
+Use `OnInvoke` to register a handler and `:Invoke()` or `:InvokeServer()` / `:InvokeClient()` to call it and wait for a return value.
+
+### Client invokes the server
+
+```lua
+-- Server — register the handler
+MyRemote:OnInvoke(function(player, request)
+    if request == "getData" then
+        return { score = 100 }
+    end
+end)
+
+-- Client — invoke and await result
+local data = MyRemote:InvokeServer("getData")
+print(data.score) --> 100
+```
+
+### Server invokes a client
+
+```lua
+-- Client — register the handler
+MyRemote:OnInvoke(function(request)
+    return UserInputService:GetLastInputType().Name
+end)
+
+-- Server — invoke a specific player and await result
+local inputType = MyRemote:InvokeClient(player, "getInput")
+```
+
+### Context-agnostic invoke
+
+`:Invoke()` routes automatically. When called from the client it invokes the server; when called from the server the first argument must be the target `Player`:
+
+```lua
+-- From client
+local result = MyRemote:Invoke("getData")
+
+-- From server
+local result = MyRemote:Invoke(player, "getData")
+```
+
+:::caution
+Invoking a client from the server can hang indefinitely if the client disconnects or never responds. Prefer firing events with a follow-up callback pattern for server-initiated requests where possible.
+:::
+
+---
+
+## Recommended patterns
+
+### Dedicated remote per feature
+
+Create one remote per logical feature rather than multiplexing many actions over a single remote. This keeps handlers focused and makes debugging easier.
+
+```lua
+-- inventory.server.luau
+local InventoryRemote = GetRemote("Inventory")
+
+InventoryRemote:OnEvent(function(player, action, itemId)
+    if action == "equip" then
+        equipItem(player, itemId)
+    elseif action == "drop" then
+        dropItem(player, itemId)
+    end
+end)
+```
+
+### Validating client input on the server
+
+Never trust data sent from the client. Always validate before acting on it:
+
+```lua
+InventoryRemote:OnEvent(function(player, action, itemId)
+    if typeof(itemId) ~= "number" then return end
+    if not playerOwnsItem(player, itemId) then return end
+
+    equipItem(player, itemId)
+end)
+```
+
+### Sharing the remote reference
+
+Since `GetRemote` returns the same object for a given name everywhere, you can safely call it in both a server script and a client script using the same name string — no shared module or passing of references is needed.
+
+```lua
+-- myFeature.server.luau
+local MyRemote = GetRemote("MyFeature")
+
+-- myFeature.client.luau
+local MyRemote = GetRemote("MyFeature") -- same underlying remote
+```
+
+---
+
+## Destroying a remote
+
+`:Destroy()` disconnects every listener, removes the remote instances on the server, and turns the remote's methods into no-ops. Use it for remotes created for something temporary, such as a single round:
+
+```lua
+local RoundRemote = GetRemote(`Round:{roundId}`)
+
+-- When the round ends
+RoundRemote:Destroy()
+```
+
+---
+
+<!-- https://order.atomichorizon.net/docs/developer-tools -->
+> Use Order's Cmdr console, Branches place switcher and PermissionService to control who can run developer tools in your Roblox game.
+
+# Developer Tools
+
+Order includes a [Cmdr](https://eryn.io/Cmdr/) console and a Branches pane for moving between the places in your experience. Who can use them is controlled by `PermissionService`.
+
+## Opening the tools
+
+| Tool | Permission | Ways to open |
+| --- | --- | --- |
+| Cmdr console | `cmdr` | <kbd>F2</kbd> for everyone, plus `/cmdr` or `/console` in chat and a top bar button |
+| Branches pane | `branches` | `/branches` in chat and a top bar button |
+
+The chat commands and top bar buttons only appear for players with the matching permission. Change how they appear in `DeveloperToolsConfig` (`src/client/core/lib/DeveloperTools`):
+
+| Setting | Default | Effect |
+| --- | --- | --- |
+| `ChatCommands` | `true` | Adds the `/cmdr`, `/console` and `/branches` chat commands. On touch devices, chat is the only way to open the tools without the top bar buttons. |
+| `TopbarButtons` | `true` | Adds top bar buttons for the tools. |
+| `GroupTopbarButtons` | `true` | When a player can see more than one tool button, puts them in a single "Dev" group that expands when selected. |
+
+Teleport requests from the Branches pane are checked on the server: only players with the `branches` permission are teleported, and only to places in the same experience.
+
+## Cmdr
+
+Cmdr's built-in commands are registered, including `ban` and `unban`, which accept a player in the server, an offline username, or `#UserId`. Players with the `mod` permission can run `kick`, `boot`, `ban` and `unban`. Every other command needs the `cmdr` permission.
+
+Custom commands, types and hooks go in the `CustomCommands`, `CustomTypes` and `CustomHooks` folders under `src/server/core/tasks/CmdrHooks`. Order adds two types:
+
+| Type | Accepts | Parses to |
+| --- | --- | --- |
+| `branch` | The name of a place in the experience | The place |
+| `userIdOrPlayer` / `userIdsOrPlayers` | A player in the server (with autocomplete), a UserId, or `.` / `me` for yourself | A UserId |
+
+## Permissions
+
+Permissions are set in `PermissionsConfig` (`src/shared/core/lib`). A check takes the first rule that applies, in this order:
+
+1. A runtime grant or revoke from `PermissionService:SetRuntimePermission()`
+2. `UserDeniedPermissions`
+3. `Admins`, then the test player and Studio settings
+4. `UserPermissions`
+5. `GroupPermissions`
+
+```lua
+GroupPermissions = {
+    ["cmdr"] = {
+        [123456] = { RoleIds = { 987654321 } },
+    },
+},
+```
+
+Group permissions match **role IDs**, which you can copy with the "Copy Role ID" button at the bottom of a role's settings page. Roblox no longer uses rank to order roles, so it recommends checking role IDs instead. A `MinimumRank` rule still works but logs a deprecation warning. Only public roles can be checked.
+
+| Function | Use |
+| --- | --- |
+| `PermissionService:HasPermission(player, label)` | Checks a player in the server. Works on the client and the server. |
+| `PermissionService:UserHasPermission(userId, label)` | Checks any user, including ones not in the server. |
+| `PermissionService:SetRuntimePermission(label, userId, granted)` | Server only. Grants (`true`) or revokes (`false`) a permission until the server shuts down, or removes the override (`nil`). Players in the server see the change through an attribute. |
+
+---
+
+<!-- https://order.atomichorizon.net/docs/badges-and-analytics -->
+> Award Roblox badges reliably with Order's BadgeGiver queue, and set up Gamebeast analytics with an experience secret.
+
+# Badges and Analytics
+Order awards badges through a queue that stays within Roblox's BadgeService limits and retries failed awards, and it sets up the Gamebeast analytics SDK when your experience has a Gamebeast key.
+
+## Badges
+
+`BadgeGiver` awards badges from the server. It queues awards so they stay inside BadgeService's request limits, and records each award in [player data](https://order.atomichorizon.net/docs/player-data) so a badge that fails is tried again later.
+
+```lua
+local BadgeGiver = shared("BadgeGiver")
+
+BadgeGiver:GiveBadge(player, 123456789)
+```
+
+`GiveBadge(player, badgeId, spreadSeconds?)` returns once the badge is queued, not once it is awarded. It yields until the player's data loads. It does nothing if the player's data shows they already have the badge, or if the player has left.
+
+When many players earn a badge at the same moment, such as at the end of a round, pass `spreadSeconds` to delay each award by a random time up to that many seconds. Their requests then reach BadgeService over time rather than all at once:
+
+```lua
+for _, player in winners do
+    BadgeGiver:GiveBadge(player, ROUND_WINNER_BADGE_ID, 10)
+end
+```
+
+:::note
+In Studio, `GiveBadge` does nothing, since badges can't be awarded there.
+:::
+
+### How awards are processed
+
+1. `GiveBadge` adds the badge to the player's `PendingBadges`, then queues it. Queuing the same badge twice for one player does nothing.
+2. A worker takes awards from the queue. It first checks `UserHasBadgeAsync`, and only calls `AwardBadgeAsync` if the player doesn't have the badge.
+3. On success, the badge moves from `PendingBadges` to `AwardedBadges`. If BadgeService says the badge can't be awarded, for example because it's disabled, the server warns and the badge is removed from `PendingBadges` without being retried.
+4. If a request errors, the award is retried with a delay that doubles from 2 seconds up to 60, with jitter. After 5 failed attempts it stops for the session.
+5. When a player joins, every badge left in their `PendingBadges` is queued again. This covers awards that failed, and awards cut short by the player leaving.
+
+Badge IDs are saved as string keys, so `AwardedBadges` and `PendingBadges` look like `{ ["123456789"] = true }`. Keep both keys in the [profile template](https://order.atomichorizon.net/docs/player-data#the-profile-template).
+
+### Request limits
+
+BadgeService allows 50 + 35 × players requests per minute across the server. The queue uses at most 80% of that, which leaves room for other scripts. When the budget for the last minute is spent, awards wait.
+
+If 5 requests fail in a row, the queue pauses for 60 seconds and warns. This stops it from adding load while BadgeService is having trouble.
+
+## Analytics
+
+Order sets up the [Gamebeast](https://docs.gamebeast.gg/sdk/roblox) SDK on the server and the client. It's installed as the `GamebeastSDK` package.
+
+### Enabling Gamebeast
+
+The server reads its Gamebeast key from an experience secret named `Gamebeast`, using `HttpService:GetSecret("Gamebeast")`. Add the secret in your experience's settings on the Creator Hub, with your Gamebeast project's SDK key as its value.
+
+- **With the secret**, `AnalyticsServer` sets up the SDK when the server starts.
+- **Without it**, the server prints that Gamebeast analytics is disabled, and doesn't set up the SDK.
+
+Either way, the server sets the `GamebeastEnabled` attribute on `workspace` to `true` or `false`. `AnalyticsClient` waits for that attribute, and only sets up the client SDK when it's `true`, since the client SDK waits for remotes that the server only creates during setup.
+
+### Sending events
+
+Order doesn't wrap the SDK, so use it directly through `shared("GamebeastSDK")`. For example, to send a marker from the server:
+
+```lua
+local GamebeastSDK = shared("GamebeastSDK")
+
+GamebeastSDK:GetService("Markers"):SendMarker("ItemPurchased", {
+    ItemId = itemId,
+    Price = price,
+})
+```
+
+See the [Gamebeast Roblox SDK reference](https://docs.gamebeast.gg/sdk/roblox) for the SDK's services, including markers, configs and experiments. If your game sells developer products, Gamebeast recommends tracking them with [`SendNewPurchaseGrantedMarker`](https://docs.gamebeast.gg/sdk/roblox/api/markers#sendnewpurchasegrantedmarkerreceiptinfo-position). On the client, check that `workspace:GetAttribute("GamebeastEnabled")` is `true` before using the SDK, because it won't be set up otherwise.
+
+---
+
+<!-- https://order.atomichorizon.net/docs/utilities -->
+> A tour of Order's shared Luau utilities for Roblox: Maid, Observe, CacheService, ProcessQueue, rcall, CharacterUtils and more.
+
+# Utilities
+
+Order ships a set of general purpose modules in `src/shared/core/lib` and `src/shared/core/tasks`. All of them load with `shared()` on both the server and the client. Modules with an API reference page are linked from their heading.
+
+| Module | Use |
+| --- | --- |
+| [Maid](#maid) | Cleans up connections, instances and functions together. |
+| [Observe](#observe) | Runs a callback with a property, attribute or children list now and on every change. |
+| [PlayerUtils](#playerutils) | Join callbacks, a maid per player, and cached user info. |
+| [CharacterUtils](#characterutils) | Spawn callbacks, a maid per character, and animation playback. |
+| [CacheService](#cacheservice) | Named caches with an entry limit and an age limit. |
+| [ProcessQueue](#processqueue) | Processes items one at a time, with an optional delay. |
+| [rcall](#rcall) | Retries a function that can fail, such as a web call. |
+| [Get](#get) | Waits for a path of children in one call. |
+| [GetBranches](#getbranches) | Lists the places in the experience. |
+| [Environment](#environment) | Tells you whether the server is production or testing. |
+| [FormatNumber](#formatnumber) | Adds commas or shortens numbers with suffixes. |
+| [TimerUtils](#timerutils) | Formats a countdown and tells you when it next needs redrawing. |
+| [Sounds](#sounds) | Plays `AudioPlayer` sounds from `SoundService`. |
+| [DebugRaycast and DebugPart](#debugraycast-and-debugpart) | Draws casts and parts for debugging. |
+| [Small helpers](#small-helpers) | `DeepCopy`, `lerp`, `SpecialCharacters` and `Icons`. |
+
+## Maid
+
+A `Maid` holds things that need cleaning up and cleans them all at once. Use one per object or session so nothing outlives it.
+
+```lua
+local Maid = shared("Maid")
+
+local maid = Maid.new()
+
+maid:GiveTask(workspace.ChildAdded:Connect(print))
+maid:GiveTask(someInstance)
+maid:GiveTask(function()
+    print("Cleaned up")
+end)
+
+-- Later
+maid:DoCleaning()
+```
+
+When cleaned, a maid disconnects connections, destroys instances, calls functions, cancels threads, and calls `Destroy` (or `Disconnect`) on tables that have one.
+
+| Method | Use |
+| --- | --- |
+| `GiveTask(task)` | Adds a task and returns its numeric ID. |
+| `GiveTasks(tasks)` | Adds every task in a list. |
+| `Add(task)` | Adds a task and returns the task itself, so you can create and track in one line. |
+| `GivePromise(promise)` | Tracks a pending promise and removes it once it settles. |
+| `DoCleaning()` / `Destroy()` | Cleans every task. Connections are disconnected first. |
+
+You can also give a task a name. Setting a new task under the same name cleans the old one, and setting it to `nil` cleans it without adding anything:
+
+```lua
+maid.Highlight = Instance.new("Highlight")
+maid.Highlight = nil -- Destroys the highlight
+```
+
+Names that match a `Maid` method, such as `maid.Destroy`, raise an error.
+
+`PlayerUtils` and `CharacterUtils` give you ready-made maids that clean up when a player leaves or a character is removed. See below.
+
+## Observe
+
+[API reference](https://order.atomichorizon.net/api/Observe)
+
+Each function calls the callback right away with the current value, then again on every change, and returns a connection. Pair them with a maid:
+
+```lua
+local Observe = shared("Observe")
+
+maid:GiveTask(Observe.Attribute(workspace, "RoundState", function(roundState)
+    StatusLabel.Text = `{roundState}`
+end))
+```
+
+| Function | Calls back with |
+| --- | --- |
+| `Observe.Attribute(instance, attribute, callback)` | The attribute's value. |
+| `Observe.Property(instance, property, callback)` | The property's value. |
+| `Observe.Children(instance, callback)` | The full list of children, whenever one is added or removed. Returns a table with `Disconnect()` and `Connected` rather than a real connection. |
+
+## PlayerUtils
+
+[API reference](https://order.atomichorizon.net/api/PlayerUtils)
+
+```lua
+local PlayerUtils = shared("PlayerUtils")
+
+PlayerUtils:OnPlayerAdded(function(player, playerMaid)
+    playerMaid:GiveTask(player.Chatted:Connect(function(message)
+        print(player, message)
+    end))
+end, "LogChat")
+```
+
+| Function | Use |
+| --- | --- |
+| `OnPlayerAdded(callback, callbackName?)` | Calls `callback(player, playerMaid)` for every player in the server and every player who joins. |
+| `RemoveJoinCallback(callbackName)` | Removes a named join callback. |
+| `GetPlayerMaid(player)` | Returns a maid that is cleaned when the player leaves. |
+| `FetchUserInfo(userId)` | Returns the user's info from `UserService`, or `nil`. Yields. Results are cached, and failed lookups are not retried for a while. |
+
+## CharacterUtils
+
+[API reference](https://order.atomichorizon.net/api/CharacterUtils)
+
+```lua
+local CharacterUtils = shared("CharacterUtils")
+
+CharacterUtils:OnAnyCharacterSpawned(function(character, characterMaid, player)
+    local humanoid = character:WaitForChild("Humanoid")
+    characterMaid:GiveTask(humanoid.Died:Connect(function()
+        print(`{player} died`)
+    end))
+end, "DeathLogger")
+```
+
+The character maid is cleaned when the character is removed, so anything tied to one life goes in it.
+
+| Function | Use |
+| --- | --- |
+| `GetCharacter(player, shouldYield?)` | Returns the player's character, optionally waiting for it. |
+| `GetAllCharacters()` / `GetAllNonLocalCharacters()` | Returns the characters in the server. |
+| `OnCharacterSpawned(player, callback, callbackName?, priority?)` | Calls `callback(character, characterMaid, player)` on every spawn, and right away if the player has a character. Lower priorities run first. |
+| `OnAnyCharacterSpawned(callback, callbackName?, priority?)` | The same, for every player now and later. |
+| `OnLocalCharacterSpawned(callback, callbackName?, priority?)` | The same, for the local player. Client only. |
+| `RemoveOnSpawnedCallback(player, callbackName)`, `RemoveOnAnySpawnedCallback(callbackName)`, `RemoveLocalOnSpawnedCallback(callbackName)` | Removes a named callback. |
+| `GetCharacterMaid(player)` / `GetLocalCharacterMaid()` | Returns the maid for the current character. |
+| `GetChildFromCharacter(player, childName, shouldYield?)` | Returns a child of the character, such as `"Humanoid"`. |
+| `PlayAnimationOnCharacter(character, animationId, options?, shouldYield?)` | Loads and plays an animation. Tracks are cached per character unless `options.shouldNotCache` is set. `options` also takes `fadeTime`, `weight` and `speed`. |
+
+## CacheService
+
+[API reference](https://order.atomichorizon.net/api/CacheService)
+
+Stores values by key in named caches. Entries expire after an age limit, one hour by default. Every 30 seconds expired entries are removed, and a cache that holds more than its entry limit (1000 by default) is cleared completely.
+
+```lua
+local CacheService = shared("CacheService")
+
+local thumbnailCache = CacheService:CreateCache("Thumbnails", 200, 600)
+
+local thumbnail = thumbnailCache:GetOrAdd(userId, function()
+    return Players:GetUserThumbnailAsync(userId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size100x100)
+end)
+```
+
+`GetOrAdd` runs the callback only once per key at a time. Other callers asking for the same key wait for that result. The callback can return a cleanup function as a second value, which runs when the entry is removed, replaced or expires. `Set(key, value, cleanup?)`, `Get(key)` and `Remove(key)` work as you would expect, and `CacheService` has the same functions with the cache name as the first argument.
+
+## ProcessQueue
+
+[API reference](https://order.atomichorizon.net/api/ProcessQueue)
+
+Calls a function on each item in order, one at a time, with an optional delay in seconds between items:
+
+```lua
+local ProcessQueue = shared("ProcessQueue")
+
+local announcementQueue = ProcessQueue.new(function(message)
+    showAnnouncement(message)
+end, 3)
+
+announcementQueue:Add("Round starting")
+```
+
+Errors are caught and warned. Set `RetryFailures = true` to add failed items back to the end of the queue. `Remove(item)`, `Clear()`, `IsProcessing()` and `Destroy()` are also available.
+
+:::note
+The first `Add` on an idle queue processes the queue on the calling thread, so it yields until the queue is empty. Wrap it in `task.spawn` if the caller shouldn't wait.
+:::
+
+## rcall
+
+Calls a function and retries it if it errors. Returns the function's results, or `nil` if every attempt fails:
+
+```lua
+local rcall = shared("rcall")
+
+local userInfos = rcall({ retryLimit = 3, retryDelay = 5 }, function()
+    return UserService:GetUserInfosByUserIdsAsync({ userId })
+end)
+```
+
+| Option | Default | Effect |
+| --- | --- | --- |
+| `retryLimit` | No limit | How many attempts to make in total. Without a limit, it keeps trying until it succeeds. |
+| `retryDelay` | `2` | Seconds between attempts. |
+| `backoff` | `false` | Doubles the delay after each failure, up to 60 seconds. |
+| `jitter` | `false` | Randomizes each delay to between half and all of itself. |
+| `requireResult` | `false` | Treats a `nil` result as a failure. |
+| `async` | `false` | Runs in a new thread and returns `nil` right away. |
+| `silent` | `false` | Doesn't warn on failure. |
+| `traceback` | `false` | Includes a stack trace in the warning. |
+| `failWarning` | None | Extra text for the warning. |
+
+Arguments after the function are passed to it.
+
+## Get
+
+[API reference](https://order.atomichorizon.net/api/Get)
+
+Waits for each child in a path and returns the last one. If the last argument is a list, returns each child in it:
+
+```lua
+local Get = shared("Get")
+
+local keystone = Get(workspace, "Arch", "Keystone")
+local keystone, door = Get(workspace, "Arch", { "Keystone", "Door" })
+```
+
+## GetBranches
+
+[API reference](https://order.atomichorizon.net/api/GetBranches)
+
+Returns every place in the experience as `{ Name, DisplayName, PlaceId }`. `DisplayName` is the place's name and `Name` is the same with everything but letters and numbers removed. The result is fetched once and cached. The Branches pane in the [Developer Tools](https://order.atomichorizon.net/docs/developer-tools) uses it.
+
+```lua
+local GetBranches = shared("GetBranches")
+
+for _, branch in GetBranches() do
+    print(branch.DisplayName, branch.PlaceId)
+end
+```
+
+## Environment
+
+[API reference](https://order.atomichorizon.net/api/Environment)
+
+Tells you whether the current server is a live production server, and whether the testing data attributes are on. See [Environments](https://order.atomichorizon.net/docs/usage#environments).
+
+## FormatNumber
+
+```lua
+local FormatNumber = shared("FormatNumber")
+
+FormatNumber.AddCommas(1234567) -- "1,234,567"
+FormatNumber.Shorten(1530000) -- "1.5M"
+```
+
+`Shorten` keeps one decimal place and uses suffixes from `K`, `M`, `B` and `T` upward.
+
+## TimerUtils
+
+```lua
+local TimerUtils = shared("TimerUtils")
+
+TimerUtils:GetStringForTimeRemaining(3725) -- "1H 2M"
+TimerUtils:TimeToNextSignificantUpdate(3725) -- 125
+```
+
+`GetStringForTimeRemaining` shows days (`2D`), hours and minutes (`1H 2M`), minutes and seconds (`4M 5S`), or seconds (`9S`), depending on how much time is left. `TimeToNextSignificantUpdate` returns how many seconds until that string next changes, so a countdown can wait instead of redrawing every frame.
+
+## Sounds
+
+Plays the `AudioPlayer` instances you place under `SoundService`, found by name:
+
+```lua
+local Sounds = shared("Sounds")
+
+Sounds:PlaySound("ButtonClick")
+Sounds:PlaySound("Explosion", true, explosionPosition, 0.1)
+```
+
+`PlaySound(soundName, shouldClone?, position?, varyPitch?, duration?, emitterType?)`:
+
+- `shouldClone` plays a copy, so the same sound can overlap itself. Copies are destroyed when they end.
+- `position` (a `Vector3` or a part) plays a copy from that point through an `AudioEmitter`. `emitterType` names an emitter template under `SoundService.Audio.Emitters` to copy.
+- `varyPitch` randomizes the playback speed by up to that amount.
+- `duration` sets the playback speed so the sound lasts that many seconds.
+
+`GetSound(soundName)` returns the original sound, and `PlayExistingSound(sound, varyPitch?, duration?)` restarts a sound you already have. Copies played without a position are wired to `SoundService.Audio.Effects.Master_Fader` unless the original has its own `Wire`.
+
+## DebugRaycast and DebugPart
+
+`DebugRaycast` runs a cast and draws it, green on a hit and red on a miss. It returns the cast's result:
+
+```lua
+local DebugRaycast = shared("DebugRaycast")
+
+local result = DebugRaycast:Raycast(origin, direction, raycastParams, nil, nil, 0.2, 0.5, 3)
+```
+
+| Function | Arguments after the cast's own |
+| --- | --- |
+| `Raycast(origin, direction, params?, ...)` | `hitColor?`, `missColor?`, `thickness?`, `transparency?`, `duration?` |
+| `Spherecast(position, radius, direction, params?, ...)` | `hitColor?`, `missColor?`, `transparency?`, `duration?` |
+| `Blockcast(cframe, size, direction, params?, ...)` | `hitColor?`, `missColor?`, `transparency?`, `duration?` |
+
+Drawings go in a `DebugRaycast` folder in `workspace`, and are removed after `duration` seconds if you pass one. Pass a `thickness` for `Raycast`, since it has no default.
+
+`DebugPart.new(properties)` creates an anchored, half transparent red part. `properties` takes `Size`, `Position`, `CFrame`, `Orientation`, `Color`, `Transparency`, `CanCollide`, `Name`, `Parent` and `Lifetime` (seconds before it is removed).
+
+## Small helpers
+
+| Module | Use |
+| --- | --- |
+| `DeepCopy(table)` | Returns a copy of a table and every table inside it. |
+| `lerp(a, b, t)` | Returns the number `t` of the way from `a` to `b`. |
+| `SpecialCharacters` | Roblox's private-use glyphs for text: `Verified`, `Premium`, `Robux` and `Plus`. |
+| `Icons` | Asset IDs for shared icons, currently `Success` and `Failure`. |
+
+```lua
+local SpecialCharacters = shared("SpecialCharacters")
+
+PriceLabel.Text = `{SpecialCharacters.Robux} 100`
+```
+
+---
+
+<!-- https://order.atomichorizon.net/docs/notes -->
+> Special cases to know when using Order: cyclic dependency rules, loading modules with non-unique names, and printing module tables.
+
+# Special Notes
+A few cases need extra care when you use Order: modules with cyclic dependencies, modules that share a name, and printing a module's table.
+
+## No bare code in modules with cyclic dependencies
+In order to support cyclic dependencies, it must be guaranteed that the module in question has **no bare code that references a cyclic dependency**. That is to say that any code that references the cyclic dependency must be contained within a function. If Order detects this bare code, you will be notified with a warning in the output and no operation will be processed on the module in question.
+
+## Loading modules with non-unique names
+Modules can be specified through several different paths. If the name is unique, you can reference it simply through that. If two modules exist with the same name however, Order will warn you that it found two or more possible modules for your request, and will ask you to be more specific. You can use any level of the module paths it provides you with, as long as they're unique as well.
+
+Order does not index all potential file paths by default, so it is recommended to use the **shortest unique paths possible** in order to conserve memory usage.
+
+## Printing module tables
+One of the complications with the method Order uses to support cyclic dependencies is that if you try to print out one of these module's tables, it would return a table address instead of an output-friendly table. In order to preserve as much functionality as possible, Order will list out table keys and values in a custom format when converting the table to a string.
+
+---
+
+<!-- https://order.atomichorizon.net/docs/contributions -->
+> How to contribute to Order, the open-source Roblox framework: style rules, pull request requirements and development status.
+
+# Contributions
+Order is a fully open-source project, and I would love to take community contributions that will make it even better! In the interest of quality control though, I've decided to set forth some rules that contributions must follow in order to be integrated into the project. If this all sounds good to you, [make a pull request](https://github.com/michaeldougal/order/pulls)!
+
+## Rules
+1. **Style** - Contributions should do their best to conform to the [Roblox Luau Style Guide](https://roblox.github.io/lua-style-guide/). I realize that that's not always possible or practical, so some exceptions can be made in the interest of functionality.
+2. **Utility** - Contributions should expand or enhance Order in a way that aligns with the project's design philosophy of making things simpler and easier for the developer. Anything that does not do so will be rejected.
+3. **Documentation** - Any changes that add complex functionality should contain comments that explain **why** you're doing what you're doing. This is also part of the Roblox Luau Style Guide (rule #1), but is worth reiterating.
+
+## Development Status
+Order is still under active development. We continue to improve it as we create more games ourselves. As such, functionality and features can and will change at any time and we're still ironing out all the kinks and bugs. If you have any suggestions or find any bugs yourself, feel free to reach out! Issues, discussions, and pull requests can be submitted to [the project repo](https://github.com/atomic-horizon/order)!

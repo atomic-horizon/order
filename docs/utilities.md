@@ -1,6 +1,8 @@
 ---
 sidebar_position: 4.8
 title: Utilities
+description: "A tour of Order's shared Luau utilities for Roblox: Maid, Observe, CacheService, ProcessQueue, rcall, CharacterUtils and more."
+keywords: [luau utilities, maid, roblox cache, character utils, rcall]
 ---
 
 # Utilities

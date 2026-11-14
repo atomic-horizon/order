@@ -1,6 +1,8 @@
 ---
 sidebar_position: 6
 title: Contributions
+description: "How to contribute to Order, the open-source Roblox framework: style rules, pull request requirements and development status."
+keywords: [contribute, open source, roblox framework]
 ---
 
 # Contributions

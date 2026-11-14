@@ -1,6 +1,8 @@
 ---
 sidebar_position: 4
 title: Networking
+description: "Send events and invoke functions between the Roblox client and server with GetRemote, including rate limits and unreliable events."
+keywords: [roblox remotes, remoteevent, remotefunction, getremote, luau networking]
 ---
 
 # Networking with GetRemote

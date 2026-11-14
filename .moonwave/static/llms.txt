@@ -1,0 +1,28 @@
+# Order
+
+> Order is a free, open-source (MIT) Luau framework for Roblox games. It loads any module by name with `shared()`, starts every task in a predictable Prep then Init order on the client and the server, and includes player data, networking, UI and developer tools.
+
+Order is used in production in Combat Arena and The Block, and sustained over 800,000 concurrent users with no errors during the Roblox Innovation Awards event in The Block. Projects can start from the GitHub template, packages install with Forest (recommended) or Wally, and code syncs into Roblox Studio with Rojo.
+
+## Docs
+
+- [Getting Started](https://order.atomichorizon.net/docs/intro): Install Order, create a project from the template, and write your first task.
+- [Usage](https://order.atomichorizon.net/docs/usage): Settings, environments, package folders, how tasks are found and initialized, and loading modules with `shared()`.
+- [Player Data](https://order.atomichorizon.net/docs/player-data): Saving player data with ProfileStore, replicating it with ReplicaService, and reading it on the client.
+- [AtomicUI](https://order.atomichorizon.net/docs/atomicui): AtomicPane, AtomicButton, ScreenGui and UIStateManager for animated UI.
+- [StateManager](https://order.atomichorizon.net/docs/statemanager): Named gameplay states with rules for which states block, end or start others.
+- [Networking](https://order.atomichorizon.net/docs/networking): Remote events and functions between client and server with GetRemote, including rate limits.
+- [Developer Tools](https://order.atomichorizon.net/docs/developer-tools): The Cmdr console, the Branches place switcher, and PermissionService.
+- [Badges and Analytics](https://order.atomichorizon.net/docs/badges-and-analytics): Queued badge awards with BadgeGiver, and Gamebeast analytics setup.
+- [Utilities](https://order.atomichorizon.net/docs/utilities): Maid, Observe, CacheService, ProcessQueue, rcall, CharacterUtils and other shared helpers.
+- [Special Notes](https://order.atomichorizon.net/docs/notes): Cyclic dependency rules and loading modules with non-unique names.
+
+## API
+
+- [API Reference](https://order.atomichorizon.net/api): Generated reference for every documented class, such as PlayerData, Remote, AtomicPane and PermissionService.
+
+## Optional
+
+- [Full docs as plain text](https://order.atomichorizon.net/llms-full.txt): Every docs page in one file.
+- [Contributions](https://order.atomichorizon.net/docs/contributions): How to contribute to Order.
+- [Source code](https://github.com/atomic-horizon/order): The GitHub repository and project template.

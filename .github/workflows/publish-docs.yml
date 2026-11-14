@@ -21,6 +21,8 @@ jobs:
       - run: npm i -g moonwave@latest
       - name: Refresh showcase stats
         run: node scripts/fetch-showcase.mjs
+      - name: Generate llms-full.txt
+        run: node scripts/generate-llms-full.mjs
       - name: Publish
         run: |
           git remote set-url origin https://git:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git

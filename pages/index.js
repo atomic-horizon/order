@@ -1,6 +1,7 @@
 import Head from "@docusaurus/Head"
 import Link from "@docusaurus/Link"
 import useBaseUrl from "@docusaurus/useBaseUrl"
+import useDocusaurusContext from "@docusaurus/useDocusaurusContext"
 import CodeBlock from "@theme/CodeBlock"
 import Layout from "@theme/Layout"
 import clsx from "clsx"
@@ -144,7 +145,13 @@ function ShowcaseGame({ name, url, icon, visits, favorites }) {
 	const iconUrl = useBaseUrl(icon)
 
 	return (
-		<a className={styles.showcaseCard} href={url} target="_blank" rel="noopener noreferrer">
+		<a
+			className={styles.showcaseCard}
+			href={url}
+			target="_blank"
+			rel="noopener noreferrer"
+			aria-label={`${name} on Roblox: ${COMPACT_NUMBER_FORMAT.format(visits)} visits, ${COMPACT_NUMBER_FORMAT.format(favorites)} favorites`}
+		>
 			<img className={styles.showcaseIcon} src={iconUrl} alt={`${name} icon`} width="96" height="96" loading="lazy" />
 			<div className={styles.showcaseBody}>
 				<h3 className={styles.showcaseName}>
@@ -261,7 +268,7 @@ function ProofStrip() {
 }
 
 function ProofIcon({ name, icon }) {
-	return <img className={styles.proofIcon} src={useBaseUrl(icon)} alt={name} width="32" height="32" />
+	return <img className={styles.proofIcon} src={useBaseUrl(icon)} alt={`${name} icon`} width="32" height="32" />
 }
 
 function Pillars() {
@@ -354,9 +361,93 @@ function ClosingCallToAction() {
 	)
 }
 
-const TITLE = "Order"
+// ── FAQ ──────────────────────────────────────────────────────────────────────
+
+// Answers are plain strings so the same text feeds both the page and the
+// FAQPage structured data
+const FAQ_ENTRIES = [
+	{
+		question: "What is Order?",
+		answer: `Order is a lightweight Luau framework for structuring Roblox games. It loads any module by name with shared(), starts every task in a predictable order on the client and the server, and includes player data, networking, UI and developer tools.`,
+	},
+	{
+		question: "Is Order free and open source?",
+		answer: "Yes. Order is open source under the MIT license, and its source code and project template are on GitHub.",
+	},
+	{
+		question: "Does Order work with Forest and Wally?",
+		answer: "Yes. Forest is recommended for new projects, and Wally is still supported. Use one package manager per project.",
+	},
+	{
+		question: "How does Order load modules?",
+		answer: `Call shared("ModuleName") with a module's name, a partial path, or the ModuleScript itself. Modules in a tasks folder are found automatically, and each one runs Prep, then Init, in priority order. Modules can also depend on each other in a cycle.`,
+	},
+	{
+		question: "Is Order used in production?",
+		answer: "Yes. Order powers Combat Arena and The Block, and sustained over 800,000 concurrent users with no errors during the Roblox Innovation Awards event in The Block.",
+	},
+]
+
+function FrequentlyAskedQuestions() {
+	return (
+		<section className={styles.faq}>
+			<div className="container">
+				<h2 className={styles.sectionHeading}>Frequently asked questions</h2>
+				<dl className={styles.faqList}>
+					{FAQ_ENTRIES.map((entry) => (
+						<div key={entry.question} className={styles.faqItem}>
+							<dt>{entry.question}</dt>
+							<dd>{entry.answer}</dd>
+						</div>
+					))}
+				</dl>
+			</div>
+		</section>
+	)
+}
+
+// ── Structured data ──────────────────────────────────────────────────────────
+
+function getStructuredData(siteUrl) {
+	return [
+		{
+			"@context": "https://schema.org",
+			"@type": "WebSite",
+			name: "Order",
+			url: `${siteUrl}/`,
+			description: PITCH,
+		},
+		{
+			"@context": "https://schema.org",
+			"@type": "SoftwareSourceCode",
+			name: "Order",
+			description: PITCH,
+			url: `${siteUrl}/`,
+			codeRepository: "https://github.com/atomic-horizon/order",
+			programmingLanguage: "Luau",
+			runtimePlatform: "Roblox",
+			license: "https://opensource.org/licenses/MIT",
+			version: "3.1.0",
+			author: { "@type": "Organization", name: "Atomic Horizon LLC" },
+		},
+		{
+			"@context": "https://schema.org",
+			"@type": "FAQPage",
+			mainEntity: FAQ_ENTRIES.map((entry) => ({
+				"@type": "Question",
+				name: entry.question,
+				acceptedAnswer: { "@type": "Answer", text: entry.answer },
+			})),
+		},
+	]
+}
+
+const TITLE = "Order: Luau framework for structuring Roblox games"
 
 export default function Home() {
+	const { siteConfig } = useDocusaurusContext()
+	const structuredData = getStructuredData(siteConfig.url)
+
 	return (
 		<>
 			<Layout title={TITLE} description={PITCH}>
@@ -366,18 +457,21 @@ export default function Home() {
 					<Pillars />
 					<HowItWorks />
 					<Showcase />
+					<FrequentlyAskedQuestions />
 					<ClosingCallToAction />
 				</main>
 			</Layout>
 			<Head>
 				<title>{TITLE}</title>
+				<link rel="canonical" href={`${siteConfig.url}/`} />
 				<meta property="og:type" content="website" />
 				<meta property="og:title" content={TITLE} />
 				<meta property="og:description" content={PITCH} />
-				<meta property="og:image" content="https://atomic-horizon.github.io/order/img/embed_banner.png" />
-				<meta property="twitter:domain" content="atomic-horizon.github.io" />
-				<meta property="twitter:url" content="https://atomic-horizon.github.io/order/" />
-				<meta name="twitter:image" content="https://atomic-horizon.github.io/order/img/embed_banner.png" />
+				{structuredData.map((entry) => (
+					<script key={entry["@type"]} type="application/ld+json">
+						{JSON.stringify(entry)}
+					</script>
+				))}
 			</Head>
 		</>
 	)

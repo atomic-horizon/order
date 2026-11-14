@@ -1,6 +1,8 @@
 ---
 sidebar_position: 3.5
 title: StateManager
+description: "Track named gameplay states in Roblox with Order's StateManager, with rules for which states block, end or start others."
+keywords: [roblox state machine, statemanager, luau, gameplay states]
 ---
 
 # StateManager

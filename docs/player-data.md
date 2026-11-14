@@ -1,6 +1,8 @@
 ---
 sidebar_position: 2.5
 title: Player Data
+description: "Save and replicate Roblox player data in Order with ProfileStore and ReplicaService, and read it on the client with DataController."
+keywords: [roblox player data, profilestore, replicaservice, datastore, luau]
 ---
 
 # Player Data

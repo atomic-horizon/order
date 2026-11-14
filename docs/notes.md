@@ -1,9 +1,13 @@
 ---
 sidebar_position: 5
 title: Special Notes
+description: "Special cases to know when using Order: cyclic dependency rules, loading modules with non-unique names, and printing module tables."
+keywords: [order cyclic dependencies, luau require, shared]
 ---
 
 # Special Notes
+A few cases need extra care when you use Order: modules with cyclic dependencies, modules that share a name, and printing a module's table.
+
 ## No bare code in modules with cyclic dependencies
 In order to support cyclic dependencies, it must be guaranteed that the module in question has **no bare code that references a cyclic dependency**. That is to say that any code that references the cyclic dependency must be contained within a function. If Order detects this bare code, you will be notified with a warning in the output and no operation will be processed on the module in question.
 
