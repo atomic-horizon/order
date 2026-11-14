@@ -52,7 +52,7 @@ local PREVIOUS_SESSION_RELEASE_TIMEOUT = 15
 -- Every testing place and Studio session shares the testing store
 local STORE_NAME = if Environment.IsProduction() and not Environment.UsesMockData()
 	then "PlayerData_Prod"
-	else "PlayerData_Testing2"
+	else "PlayerData_Testing"
 -- Loads saved data without a session lock and never writes it back
 local READ_ONLY_DATA = Environment.UsesReadOnlyData()
 
