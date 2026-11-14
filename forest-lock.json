@@ -1,0 +1,128 @@
+{
+  "file_version": 2,
+  "mounts": {
+    "ServerPackages": {
+      "packages": {
+        "evaera/cmdr": [
+          {
+            "dependencies": {},
+            "integrity": "f555d109c4d3249aa69666c31e28731468aaf2d72290ca6499397bc08960ce0f",
+            "location": "~",
+            "public": true,
+            "root": "Cmdr/init.luau",
+            "version": "1.13.1"
+          }
+        ],
+        "lm-loleris/profilestore": [
+          {
+            "dependencies": {},
+            "integrity": "f41d172a0dda687464c57c6820686cebdfa872bf6d3790073157928701ee379d",
+            "location": "~",
+            "public": true,
+            "root": "ProfileStore.luau",
+            "version": "1.0.3"
+          }
+        ]
+      }
+    }
+  },
+  "packages": {
+    "1foreverhd/topbarplus": [
+      {
+        "dependencies": {},
+        "integrity": "c03c8d0fc427bd93bbef0e60e76767ee0c8cd39598284bb2aea45fbe61a6008d",
+        "location": "~",
+        "public": true,
+        "root": "src/init.lua",
+        "version": "3.5.0"
+      }
+    ],
+    "chiefwildin/AnimNation": [
+      {
+        "dependencies": {},
+        "integrity": "318d6ae0acefc368168afc3e90040e9dac10f7bf367abb47e21165035a8fbfbb",
+        "location": "~",
+        "public": true,
+        "root": "AnimNation/init.luau",
+        "version": "1.14.0"
+      }
+    ],
+    "evaera/promise": [
+      {
+        "dependencies": {},
+        "integrity": "b7ee0f4d28ba123bcb8beb29404521ce39d61533e5490212be31adefdbadcd9e",
+        "location": "~/Component",
+        "public": true,
+        "root": "lib/init.lua",
+        "version": "4.0.0"
+      }
+    ],
+    "gamebeast/RobloxSDK": [
+      {
+        "dependencies": {},
+        "integrity": "3b23f38ac67bb29904881f32ecca9d43e1013a4bcbaff55e385a13331a4b81a1",
+        "location": "~",
+        "public": true,
+        "root": "src/init.lua",
+        "version": "1.0.0"
+      }
+    ],
+    "sleitnick/component": [
+      {
+        "dependencies": {
+          "evaera/promise": {
+            "alias": "Promise",
+            "version": "4.0.0"
+          },
+          "sleitnick/signal": {
+            "alias": "Signal",
+            "version": "2.0.3"
+          },
+          "sleitnick/symbol": {
+            "alias": "Symbol",
+            "version": "2.0.1"
+          },
+          "sleitnick/trove": {
+            "alias": "Trove",
+            "version": "1.8.0"
+          }
+        },
+        "integrity": "e0ce1752c348238f81e7cb5092966eea2f1b13a46da0ff95772c6738b4fbfd63",
+        "location": "~",
+        "public": true,
+        "root": "component/init.lua",
+        "version": "2.4.8"
+      }
+    ],
+    "sleitnick/signal": [
+      {
+        "dependencies": {},
+        "integrity": "3bd41c1da06398ff98753efc9e588ada05117b7cd0ec165b9af0e1d23cf5f7b9",
+        "location": "~",
+        "public": true,
+        "root": "init.luau",
+        "version": "2.0.3"
+      }
+    ],
+    "sleitnick/symbol": [
+      {
+        "dependencies": {},
+        "integrity": "86843ea2d17e99697532fdd4451f90a9db9c06d2fcd61f7ad440a858f7c92306",
+        "location": "~/Component",
+        "public": true,
+        "root": "init.lua",
+        "version": "2.0.1"
+      }
+    ],
+    "sleitnick/trove": [
+      {
+        "dependencies": {},
+        "integrity": "0e68f339cff4697faf090b7d31fb457707f3777444e241001baa734dfbb952dd",
+        "location": "~",
+        "public": true,
+        "root": "init.luau",
+        "version": "1.8.0"
+      }
+    ]
+  }
+}
