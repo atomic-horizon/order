@@ -1,7 +1,7 @@
 --[[
 	Author(s): ChiefWildin
 	Module: Permissions.lua
-	Version: 1.1.0
+	Version: 1.2.0
 
 	Determines who is allowed to run commands with cmdr.
 ]]
@@ -16,11 +16,7 @@ local MOD_COMMANDS = {
 	"kick",
 	"boot",
 	"ban",
-	"banid",
-	"banuser",
 	"unban",
-	"unbanid",
-	"unbanuser",
 }
 
 -- Public Functions
