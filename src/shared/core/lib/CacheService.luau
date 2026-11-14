@@ -173,7 +173,7 @@ end
 	@param data any -- The value to cache
 ]=]
 function CacheService:Set(cacheName: string, index: string, data: any)
-	Cache.new(cacheName):Set(index, data)
+	CacheService:CreateCache(cacheName):Set(index, data)
 end
 
 --[=[
@@ -184,7 +184,7 @@ end
 	@return any?
 ]=]
 function CacheService:Get(cacheName: string, index: string)
-	return Cache.new(cacheName):Get(index)
+	return CacheService:CreateCache(cacheName):Get(index)
 end
 
 --[=[
@@ -197,7 +197,7 @@ end
 	@return any?
 ]=]
 function CacheService:GetOrAdd(cacheName: string, index: string, addCallback: () -> any?): any?
-	return Cache.new(cacheName):GetOrAdd(index, addCallback)
+	return CacheService:CreateCache(cacheName):GetOrAdd(index, addCallback)
 end
 
 -- Cache clearing to prevent memory leakage

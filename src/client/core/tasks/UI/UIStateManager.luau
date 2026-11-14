@@ -2,7 +2,7 @@
 
 	File: UIStateManager.lua
 	Author(s): Refactor
-	Version: 1.0.0-atomicui
+	Version: 1.0.1-atomicui
 
 	https://github.com/rfct0r/UIStateManager
 
@@ -78,7 +78,12 @@ local EventHooks = {
 local function runHook(hookName: string, newState: string, oldState: string?): ()
 	if EventHooks[hookName] then
 		for _, hook in EventHooks[hookName] do
-			hook(newState, oldState)
+			-- Contained so one failing hook cannot leave the UI half applied or
+			-- stop the hooks after it from running
+			local success, message = pcall(hook, newState, oldState)
+			if not success then
+				warn(`[UIStateManager] {hookName} hook error: {message}`)
+			end
 		end
 	end
 end

@@ -2,7 +2,7 @@
 
 	Author(s): ChiefWildin
 	Module: PlayerUtils.lua
-	Version: 2.0.0
+	Version: 2.0.1
 
 ]]
 
@@ -19,6 +19,7 @@ local UserService = game:GetService("UserService")
 
 -- Dependencies
 
+local CacheService = shared("CacheService") ---@module CacheService
 local Maid = shared("Maid") ---@module Maid
 local rcall = shared("rcall") ---@module rcall
 
@@ -45,11 +46,18 @@ type UserInfo = {
 
 local PlayerUtils = {}
 
+-- Constants
+
+-- Seconds a failed user info lookup is remembered, so a bad UserId is not
+-- requested again on every call
+local FAILED_LOOKUP_CACHE_SECONDS = 60
+
 -- Global Variables
 
 local JoinCallbacks = {} :: { [string | number]: (player: Player, playerMaid: Maid) -> () }
 local PlayerMaids = {} :: { [Player]: { Maid } }
-local UserInfo = {} :: { [number]: UserInfo }
+local UserInfoCache = CacheService:CreateCache("PlayerUtils.UserInfo")
+local FailedUserInfoCache = CacheService:CreateCache("PlayerUtils.FailedUserInfo", nil, FAILED_LOOKUP_CACHE_SECONDS)
 
 -- Public Functions
 
@@ -104,11 +112,22 @@ end
 function PlayerUtils:GetPlayerMaid(player: Player): Maid
 	assert(player, "Must provide a Player object to fetch maid")
 
-	if not PlayerMaids[player] then
-		PlayerMaids[player] = Maid.new()
+	if PlayerMaids[player] then
+		return PlayerMaids[player]
 	end
 
-	return PlayerMaids[player]
+	local playerMaid = Maid.new()
+
+	-- PlayerRemoving has already fired for a player who has left, so a maid
+	-- stored now would never be cleaned up. Hand back one that cleans itself.
+	if not player.Parent then
+		task.defer(playerMaid.DoCleaning, playerMaid)
+		return playerMaid
+	end
+
+	PlayerMaids[player] = playerMaid
+
+	return playerMaid
 end
 
 --[=[
@@ -120,25 +139,28 @@ end
 	@yields
 ]=]
 function PlayerUtils:FetchUserInfo(userId: number): UserInfo?
-	local cachedInfo = UserInfo[userId]
+	local cachedInfo = UserInfoCache:Get(userId)
 	if cachedInfo then
 		return cachedInfo
 	end
 
-	local success, result = rcall({ retryLimit = 3, retryDelay = 5 }, function()
-		return UserService:GetUserInfosByUserIdsAsync({ userId })
-	end)
-
-	if not success then
+	if FailedUserInfoCache:Get(userId) then
 		return nil
 	end
 
-	if result and typeof(result) == "table" and #result > 0 then
+	-- rcall returns the callback's own results, or nil once every retry fails
+	local result = rcall({ retryLimit = 3, retryDelay = 5 }, function()
+		return UserService:GetUserInfosByUserIdsAsync({ userId })
+	end)
+
+	if typeof(result) == "table" and #result > 0 then
 		local userInfo = result[1]
-		UserInfo[userId] = userInfo
+		UserInfoCache:Set(userId, userInfo)
 
 		return userInfo
 	end
+
+	FailedUserInfoCache:Set(userId, true)
 
 	return nil
 end

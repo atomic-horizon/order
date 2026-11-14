@@ -1,7 +1,7 @@
 --[[ File Info
 	CharacterUtils.luau
 	@TactBacon
-	Version: 1.7.3
+	Version: 1.7.4
 
 	Provides utility functions for working with characters.  Adds callbacks for
 	character spawning and provides a maid for cleaning up when the character is
@@ -526,11 +526,22 @@ function CharacterUtils:GetCharacterMaid(player: Player | Model): Maid
 
 	assert(player, "Attempt to get a character maid for an invalid player")
 
-	if not CharacterMaids[player] then
-		CharacterMaids[player] = Maid.new()
+	if CharacterMaids[player] then
+		return CharacterMaids[player]
 	end
 
-	return CharacterMaids[player]
+	local characterMaid = Maid.new()
+
+	-- PlayerRemoving has already fired for a player who has left, so a maid
+	-- stored now would never be cleaned up. Hand back one that cleans itself.
+	if not player.Parent then
+		task.defer(characterMaid.DoCleaning, characterMaid)
+		return characterMaid
+	end
+
+	CharacterMaids[player] = characterMaid
+
+	return characterMaid
 end
 
 --[=[

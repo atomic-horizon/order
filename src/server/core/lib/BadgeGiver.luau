@@ -2,7 +2,7 @@
 
 	Author(s): ChiefWildin
 	Module: BadgeGiver.luau
-	Version: 1.0.1
+	Version: 1.0.2
 
 ]]
 
@@ -64,11 +64,11 @@ function BadgeGiver:GiveBadge(player: Player, badgeId: number)
 		return
 	end
 
-	-- Need to double check because player might have left during ownership
-	-- check
-	rcall({ retryLimit = 3 }, BadgeService.AwardBadge, BadgeService, player.UserId, badgeId)
+	local awarded = rcall({ retryLimit = 3 }, BadgeService.AwardBadgeAsync, BadgeService, player.UserId, badgeId)
 
-	if player.Parent then
+	-- Only recorded on success, so a failed award is tried again next time.
+	-- The player might also have left while the award was in flight.
+	if awarded == true and player.Parent then
 		PlayerData:SetValue(player, { "AwardedBadges", badgeId }, true)
 	end
 end

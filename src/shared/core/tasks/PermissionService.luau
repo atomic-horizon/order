@@ -2,7 +2,7 @@
 
 	Author(s): ChiefWildin
 	Module: PermissionService.lua
-	Version: 1.0.0
+	Version: 1.0.1
 
 ]]
 
@@ -16,6 +16,10 @@
 	for the group hosting the project.
 	:::
 ]=]
+
+-- Services
+
+local RunService = game:GetService("RunService")
 
 -- Dependencies
 
@@ -42,6 +46,9 @@ local GROUP_PERMISSIONS = {
 	["mod"] = {
 		[13911975] = 250, -- Atomic Horizon / Moderator
 	},
+	["branches"] = {
+		[13911975] = 253, -- Atomic Horizon / Developer
+	},
 }
 
 -- A list of user IDs for players who should have all permissions. Skips group
@@ -56,7 +63,9 @@ local ADMINS = {
 -- Global Variables
 
 local PermissionsRemote = GetRemote("Permissions")
-local PermissionsCache = CacheService:CreateCache("Permissions", 50, 60)
+-- One entry per player per label. CacheService clears a cache outright once it
+-- passes its limit, so the limit must hold a full server checking every label.
+local PermissionsCache = CacheService:CreateCache("Permissions", 1024, 60)
 
 -- Public Functions
 
@@ -83,21 +92,37 @@ function PermissionService:HasPermission(player: Player, permission: string): bo
 		return cachedCheck
 	end
 
+	-- GetRankInGroup answers 0 for a group the player is not in, so a nil rank
+	-- means every retry failed. A failed lookup denies without being cached, so
+	-- a brief API outage does not lock anyone out for the cache's lifetime.
+	local everyLookupAnswered = true
 	for groupId, minimumRank in GROUP_PERMISSIONS[permission] do
 		local rank = rcall({ retryLimit = 3, retryDelay = 2 }, player.GetRankInGroup, player, groupId)
-		if rank and rank >= minimumRank then
+		if rank == nil then
+			everyLookupAnswered = false
+			continue
+		end
+
+		if rank >= minimumRank then
 			PermissionsCache:Set(`{player.UserId}.{permission}`, true)
 			return true
 		end
 	end
 
-	PermissionsCache:Set(`{player.UserId}.{permission}`, false)
+	if everyLookupAnswered then
+		PermissionsCache:Set(`{player.UserId}.{permission}`, false)
+	end
+
 	return false
 end
 
 -- Task Initialization
 
-function PermissionService:Run()
+function PermissionService:Init()
+	if not RunService:IsServer() then
+		return
+	end
+
 	PermissionsRemote:OnInvoke(function(player, permission)
 		return self:HasPermission(player, permission)
 	end)

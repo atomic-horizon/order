@@ -2,7 +2,7 @@
 
 	Author: ChiefWildin
 	Module: GetRemote.lua
-	Version: 1.5.0
+	Version: 1.5.1
 
 ]]
 
@@ -62,13 +62,20 @@ local RequestFunction: RemoteFunction
 
 -- Types
 
+-- Returned by the event connection methods. The underlying connection is made
+-- asynchronously, so this handle stands in for it and can be given to a Maid.
+export type RemoteConnection = {
+	Connected: boolean,
+	Disconnect: (self: RemoteConnection) -> (),
+}
+
 export type Remote = {
-	OnEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
-	OnUnreliableEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
-	OnClientEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
-	OnClientUnreliableEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
-	OnServerEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
-	OnServerUnreliableEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> (),
+	OnEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> RemoteConnection,
+	OnUnreliableEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> RemoteConnection,
+	OnClientEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> RemoteConnection,
+	OnClientUnreliableEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> RemoteConnection,
+	OnServerEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> RemoteConnection,
+	OnServerUnreliableEvent: (self: Remote, callback: (...any) -> (), rateLimitInterval: number?) -> RemoteConnection,
 	OnInvoke: (self: Remote, callback: (player: Player, ...any) -> any) -> (),
 	FireClient: (self: Remote, player: Player, ...any) -> (),
 	FireClientUnreliable: (self: Remote, player: Player, ...any) -> (),
@@ -96,6 +103,63 @@ export type RemoteForceLoad = { Event: boolean, UnreliableEvent: boolean, Functi
 	that combines their interfaces into a single object. Instances are created
 	and retrieved via [GetRemote](/api/GetRemote).
 ]=]
+
+-- Private Functions
+
+-- Runs `connect` in a new thread and returns a handle for the connection it
+-- makes. Disconnecting the handle before the connection exists disconnects it
+-- as soon as it is made.
+local function connectDeferred(connect: () -> RBXScriptConnection?): RemoteConnection
+	local underlyingConnection: RBXScriptConnection? = nil
+	local handle = {
+		Connected = true,
+	}
+
+	function handle.Disconnect(_self: RemoteConnection)
+		handle.Connected = false
+
+		if underlyingConnection then
+			underlyingConnection:Disconnect()
+			underlyingConnection = nil
+		end
+	end
+
+	task.spawn(function()
+		local newConnection = connect()
+		if not newConnection then
+			handle.Connected = false
+			return
+		end
+
+		if handle.Connected then
+			underlyingConnection = newConnection
+		else
+			newConnection:Disconnect()
+		end
+	end)
+
+	return handle :: RemoteConnection
+end
+
+-- Turns a Player or a list of Players into a set, or nil if neither was given
+local function toExcludedSet(excluded: Player | { Player }): { [Player]: true }?
+	if typeof(excluded) == "Instance" and excluded:IsA("Player") then
+		return { [excluded] = true }
+	end
+
+	if typeof(excluded) ~= "table" then
+		return nil
+	end
+
+	local excludedSet = {}
+	for _, player in excluded do
+		if typeof(player) == "Instance" and player:IsA("Player") then
+			excludedSet[player] = true
+		end
+	end
+
+	return excludedSet
+end
 
 -- Classes
 
@@ -328,12 +392,12 @@ end
 
 	@param callback function -- The callback to invoke when the event fires
 	@param rateLimitInterval number? -- If provided, rate-limits the callback to this interval in seconds
-	@return RBXScriptConnection
+	@return RemoteConnection -- A handle that disconnects the callback, safe to give to a Maid
 ]=]
-function Remote:OnEvent(callback: (...any) -> (), rateLimitInterval: number?)
-	task.spawn(function()
+function Remote:OnEvent(callback: (...any) -> (), rateLimitInterval: number?): RemoteConnection
+	return connectDeferred(function()
 		if not RunService:IsRunning() then
-			return
+			return nil
 		end
 
 		local event = if IS_SERVER then self:_getEventServer().OnServerEvent else self:_getEventClient().OnClientEvent
@@ -358,10 +422,14 @@ Remote.OnClientEvent = Remote.OnEvent
 
 	@param callback function -- The callback to invoke when the event fires
 	@param rateLimitInterval number? -- If provided, rate-limits the callback to this interval in seconds
-	@return RBXScriptConnection
+	@return RemoteConnection -- A handle that disconnects the callback, safe to give to a Maid
 ]=]
-function Remote:OnUnreliableEvent(callback: (...any) -> (), rateLimitInterval: number?)
-	task.spawn(function()
+function Remote:OnUnreliableEvent(callback: (...any) -> (), rateLimitInterval: number?): RemoteConnection
+	return connectDeferred(function()
+		if not RunService:IsRunning() then
+			return nil
+		end
+
 		local event = if IS_SERVER
 			then self:_getUnreliableEventServer().OnServerEvent
 			else self:_getUnreliableEventClient().OnClientEvent
@@ -501,15 +569,14 @@ Remote.FireAllClientsFast = Remote.FireAllClientsUnreliable
 	@param ... any -- The arguments to pass to the clients
 ]=]
 function Remote:FireAllExcept(excluded: Player | { Player }, ...)
-	if typeof(excluded) == "Instance" and excluded:IsA("Player") then
-		excluded = { excluded }
-	else
+	local excludedSet = toExcludedSet(excluded)
+	if not excludedSet then
 		warn(`Attempt to exclude non-Player from FireAllExcept ({tostring(excluded)})\n{debug.traceback()}`)
 		return
 	end
 
-	for _, player in pairs(Players:GetPlayers()) do
-		if not table.find(excluded, player) then
+	for _, player in Players:GetPlayers() do
+		if not excludedSet[player] then
 			self:FireClient(player, ...)
 		end
 	end
@@ -528,15 +595,14 @@ Remote.FireAllClientsExcept = Remote.FireAllExcept
 	@param ... any -- The arguments to pass to the clients
 ]=]
 function Remote:FireAllExceptUnreliable(excluded: Player | { Player }, ...)
-	if typeof(excluded) == "Instance" and excluded:IsA("Player") then
-		excluded = { excluded }
-	else
-		warn(`Attempt to exclude non-Player from FireAllExcept ({tostring(excluded)})\n{debug.traceback()}`)
+	local excludedSet = toExcludedSet(excluded)
+	if not excludedSet then
+		warn(`Attempt to exclude non-Player from FireAllExceptUnreliable ({tostring(excluded)})\n{debug.traceback()}`)
 		return
 	end
 
-	for _, player in pairs(Players:GetPlayers()) do
-		if not table.find(excluded, player) then
+	for _, player in Players:GetPlayers() do
+		if not excludedSet[player] then
 			self:FireClientUnreliable(player, ...)
 		end
 	end
