@@ -23,6 +23,13 @@
 	5. `GroupPermissions`, checked with `GroupService:GetRolesInGroupAsync()`
 ]=]
 
+-- Types
+
+export type GroupRule = number | {
+	RoleIds: { number }?,
+	MinimumRank: number?,
+}
+
 return {
 	-- Group roles that grant a permission:
 	-- [label] = { [groupId] = { RoleIds = { roleId, ... } } }
