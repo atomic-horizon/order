@@ -2,7 +2,7 @@
 
 	PlayerData.lua
 	ChiefWildin
-	Version: 2.4.1
+	Version: 2.5.0
 
 	Handles the implementation of ProfileService and ReplicaService for
 	managing player data.
@@ -41,6 +41,9 @@ type Replica = ReplicaServiceListeners.Replica
 local INFINITE_YIELD_WARNING_ENABLED = false
 -- How long to wait before warning about infinite yields on player data fetch
 local INFINITE_YIELD_WARNING_TIME = 5
+-- How long a rejoining player's load waits for their previous session in this
+-- server to release its profile
+local PREVIOUS_SESSION_RELEASE_TIMEOUT = 15
 local STORE_NAME = if not RunService:IsStudio() and not workspace:GetAttribute("UseMockData")
 	then "PlayerData_Prod"
 	else "PlayerData_Testing2"
@@ -50,6 +53,8 @@ local STORE_NAME = if not RunService:IsStudio() and not workspace:GetAttribute("
 local PlayerCache = {}
 local PlayerProfiles = {}
 local ProcessedPlayers = {}
+local FailedPlayers: { [Player]: boolean } = {}
+local LoadedProfilesByUserId: { [number]: any } = {}
 local ProfileHolds: { [Player]: { [string]: number } } = {}
 local PlayerDataToken = ReplicaServiceListeners.NewClassToken("PlayerData")
 local ProfileStore
@@ -60,28 +65,88 @@ local ProfileStore
 
 local function deepTableCopy(originalTable: {}): {}
 	local copy = {}
-	for i: any, v: any in pairs(originalTable) do
-		if typeof(v) == "table" then
-			copy[i] = deepTableCopy(v)
+	for key: any, value: any in originalTable do
+		if typeof(value) == "table" then
+			copy[key] = deepTableCopy(value)
 		else
-			copy[i] = v
+			copy[key] = value
 		end
 	end
 	return copy
 end
 
-local function profileReleased(player: Player)
+local function describeKeyPath(keyPath: string | { string }): string
+	return if typeof(keyPath) == "table" then table.concat(keyPath, ".") else tostring(keyPath)
+end
+
+-- Players who have already left are expected to have no data, so only players
+-- still in the server are worth a warning
+local function warnMissingData(player: Player, action: string, keyPath: string | { string }): ()
+	if not player.Parent then
+		return
+	end
+
+	warn(
+		`[PlayerData] Attempt to {action} ({describeKeyPath(keyPath)}) without loaded data for {player}\n{debug.traceback()}`
+	)
+end
+
+local function profileReleased(player: Player, profile: any)
 	if PlayerCache[player] then
-		-- Destroy player data Replica
 		PlayerCache[player]:Destroy()
 	end
 
-	-- Dereference the Replica
 	PlayerCache[player] = nil
 	PlayerProfiles[player] = nil
 
+	if LoadedProfilesByUserId[player.UserId] == profile then
+		LoadedProfilesByUserId[player.UserId] = nil
+	end
+
 	-- Kick the player, just in case
 	player:Kick()
+end
+
+-- A player who rejoins the same server quickly can arrive before the previous
+-- session's profile is released, and ProfileService refuses to load a profile
+-- that is already loaded in this server
+local function waitForPreviousSessionRelease(userId: number): boolean
+	local waitStartTime = os.clock()
+	while LoadedProfilesByUserId[userId] do
+		if os.clock() - waitStartTime > PREVIOUS_SESSION_RELEASE_TIMEOUT then
+			return false
+		end
+
+		task.wait(0.1)
+	end
+
+	return true
+end
+
+local function failPlayerLoad(player: Player): ()
+	FailedPlayers[player] = true
+
+	if not RunService:IsStudio() then
+		player:Kick("An error occurred while loading. Please try again.")
+	end
+end
+
+local function setUpLoadedProfile(player: Player, profile: any): ()
+	profile:AddUserId(player.UserId)
+	profile:Reconcile()
+	profile:ListenToRelease(function()
+		profileReleased(player, profile)
+	end)
+
+	local data: Replica = ReplicaServiceListeners.NewReplica({
+		ClassToken = PlayerDataToken,
+		Tags = { Player = player },
+		Data = profile.Data,
+		Replication = { [player] = typeof(player) == "Instance" },
+	})
+
+	PlayerCache[player] = data
+	PlayerProfiles[player] = profile
 end
 
 local function processPlayer(player: Player)
@@ -91,29 +156,30 @@ local function processPlayer(player: Player)
 
 	ProcessedPlayers[player] = true
 
+	if not waitForPreviousSessionRelease(player.UserId) then
+		warn(`[PlayerData] Previous session for {player} did not release in time`)
+		failPlayerLoad(player)
+		return
+	end
+
 	local profile = ProfileStore:LoadProfileAsync(tostring(player.UserId), "ForceLoad")
-	if profile ~= nil then
-		profile:AddUserId(player.UserId)
-		profile:Reconcile()
-		profile:ListenToRelease(function()
-			profileReleased(player)
-		end)
+	if profile == nil then
+		failPlayerLoad(player)
+		return
+	end
 
-		if player:IsDescendantOf(Players) then
-			local data: Replica = ReplicaServiceListeners.NewReplica({
-				ClassToken = PlayerDataToken,
-				Tags = { Player = player },
-				Data = profile.Data,
-				Replication = { [player] = typeof(player) == "Instance" },
-			})
+	if not player:IsDescendantOf(Players) then
+		profile:Release()
+		return
+	end
 
-			PlayerCache[player] = data
-			PlayerProfiles[player] = profile
-		else
-			profile:Release()
-		end
-	elseif not RunService:IsStudio() then
-		player:Kick("An error occurred while loading. Please try again.")
+	LoadedProfilesByUserId[player.UserId] = profile
+
+	local setupSucceeded, setupError = pcall(setUpLoadedProfile, player, profile)
+	if not setupSucceeded then
+		warn(`[PlayerData] Failed to set up data for {player}: {setupError}`)
+		profile:Release()
+		failPlayerLoad(player)
 	end
 end
 
@@ -126,11 +192,12 @@ end
 	Replica API can be found at:
 	https://madstudioroblox.github.io/ReplicaService/api/#replica
 
-	NOTE: Can return `nil` if the player has left the game, otherwise it will
-	yield until the replica is available.
+	NOTE: Can return `nil` if the player has left the game or their data failed
+	to load, otherwise it will yield until the replica is available.
 
 	@param player Player -- The player whose data Replica is being requested.
 	@return Replica? -- The Replica object associated with the given player, or nil if the player has left.
+	@yields
 ]=]
 function PlayerData:GetPlayerDataReplica(player: Player): Replica
 	local startFetchTick = os.clock()
@@ -141,7 +208,7 @@ function PlayerData:GetPlayerDataReplica(player: Player): Replica
 		error("Bad argument #1 to PlayerData:GetPlayerDataReplica, Player expected, got " .. playerVariableType)
 	end
 
-	while not PlayerCache[player] and player.Parent do
+	while not PlayerCache[player] and player.Parent and not FailedPlayers[player] do
 		task.wait()
 		if
 			INFINITE_YIELD_WARNING_ENABLED
@@ -173,9 +240,7 @@ function PlayerData:GetValue(player: Player, keyPath: string | { string }): any?
 	local dataReplica = self:GetPlayerDataReplica(player)
 
 	if not dataReplica then
-		warn(
-			`Attempt to get value ({if typeof(keyPath) == "table" then table.concat(keyPath, ".") else keyPath}) from removed player\n{debug.traceback()}`
-		)
+		warnMissingData(player, "get value", keyPath)
 		return nil
 	end
 
@@ -215,9 +280,7 @@ end
 function PlayerData:SetValue(player: Player, keyPath: string | { string }, newValue: any)
 	local dataReplica = self:GetPlayerDataReplica(player)
 	if not dataReplica then
-		warn(
-			`Attempt to set value ({if typeof(keyPath) == "table" then table.concat(keyPath, ".") else keyPath}) for removed player\n{debug.traceback()}`
-		)
+		warnMissingData(player, "set value", keyPath)
 		return
 	end
 
@@ -277,9 +340,7 @@ function PlayerData:Observe(
 ): RBXScriptConnection?
 	local dataReplica = self:GetPlayerDataReplica(player)
 	if not dataReplica then
-		warn(
-			`Attempt to set value callback ({if typeof(keyPath) == "table" then table.concat(keyPath) else keyPath}) for removed player`
-		)
+		warnMissingData(player, "observe value", keyPath)
 		return
 	end
 
@@ -310,9 +371,7 @@ function PlayerData:SetValueCallback(
 
 	local dataReplica = self:GetPlayerDataReplica(player)
 	if not dataReplica then
-		warn(
-			`Attempt to set value callback ({if typeof(keyPath) == "table" then table.concat(keyPath) else keyPath}) for removed player`
-		)
+		warnMissingData(player, "observe value", keyPath)
 		return
 	end
 	return dataReplica:ListenToChange(keyPath, callback) :: RBXScriptConnection
@@ -367,6 +426,65 @@ function PlayerData:ReleaseProfileHold(holdId: string)
 	end
 end
 
+--[=[
+	Yields until the player's data has loaded, their data failed to load, or
+	they left the game.
+
+	@param player Player -- The player whose data is being waited for.
+	@return boolean -- Whether the player's data is loaded.
+	@yields
+]=]
+function PlayerData:WaitForData(player: Player): boolean
+	return self:GetPlayerDataReplica(player) ~= nil
+end
+
+--[=[
+	Asks ProfileService to save the player's data at its next opportunity,
+	instead of waiting for the regular auto-save. Useful after an important
+	change such as a purchase. Does nothing if the player's profile is not
+	loaded.
+
+	@param player Player -- The player whose data should be saved.
+	@return boolean -- Whether a save was requested.
+]=]
+function PlayerData:RequestSave(player: Player): boolean
+	local profile = PlayerProfiles[player]
+	if not profile or not profile:IsActive() then
+		return false
+	end
+
+	profile:Save()
+	return true
+end
+
+--[=[
+	Reads the saved data of any user without loading their profile, so it does
+	not interfere with a session they may have in another server. The returned
+	data is a copy and changes to it are not saved.
+
+	@param userId number -- The UserId whose data is being read.
+	@return {[string]: any}? -- A copy of the saved data, or nil if there is none or the read failed.
+	@yields
+]=]
+function PlayerData:ViewProfileAsync(userId: number): { [string]: any }?
+	if typeof(userId) ~= "number" then
+		warn(`[PlayerData] ViewProfileAsync expected a number, got {typeof(userId)}`)
+		return nil
+	end
+
+	local viewSucceeded, profile = pcall(ProfileStore.ViewProfileAsync, ProfileStore, tostring(userId))
+	if not viewSucceeded then
+		warn(`[PlayerData] Failed to view profile for {userId}: {profile}`)
+		return nil
+	end
+
+	if profile == nil then
+		return nil
+	end
+
+	return deepTableCopy(profile.Data)
+end
+
 -- Task Initialization
 
 function PlayerData:Prep()
@@ -387,9 +505,10 @@ function PlayerData:Prep()
 		end
 
 		ProcessedPlayers[player] = nil
+		FailedPlayers[player] = nil
 	end)
 	Players.PlayerAdded:Connect(processPlayer)
-	for _, player in pairs(Players:GetPlayers()) do
+	for _, player in Players:GetPlayers() do
 		task.spawn(processPlayer, player)
 	end
 end
