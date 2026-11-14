@@ -1,7 +1,7 @@
 --[[
 	AnalyticsServer.luau
 	ChiefWildin
-    Version: 1.2.0
+    Version: 1.2.1
 ]]
 
 -- Services
@@ -13,8 +13,6 @@ local Players = game:GetService("Players")
 -- Dependencies
 
 local GamebeastSDK = shared("GamebeastSDK") ---@module GamebeastSDK
-
-local GamebeastMarkers = GamebeastSDK:GetService("Markers")
 
 -- Main job table
 
