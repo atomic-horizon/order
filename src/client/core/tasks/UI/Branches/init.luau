@@ -1,8 +1,11 @@
 local ContextActionService = game:GetService("ContextActionService")
 local Players = game:GetService("Players")
+local TextChatService = game:GetService("TextChatService")
 local UserInputService = game:GetService("UserInputService")
 
 local BranchesPane = shared("BranchesPane") ---@module BranchesPane
+local DeveloperToolsConfig = shared("DeveloperToolsConfig")
+local DeveloperTopbar = shared("DeveloperTopbar")
 local GetBranches = shared("GetBranches") ---@module GetBranches
 local GetRemote = shared("GetRemote") ---@module GetRemote
 local Icon = shared("TopbarPlus") ---@module TopbarPlus
@@ -12,6 +15,7 @@ local Branches = {}
 
 local TOGGLE_KEY_BIND = Enum.KeyCode.F3
 local TOGGLE_KEY_HINT = "Press F3 to Toggle"
+local CHAT_COMMAND_ALIAS = "/branches"
 
 local LocalPlayer = Players.LocalPlayer
 local Pane
@@ -48,11 +52,31 @@ function Branches:_setupBranches()
 	end)
 end
 
+function Branches:_setupChatCommand()
+	local chatCommand = Instance.new("TextChatCommand")
+	chatCommand.Name = "BranchesPane"
+	chatCommand.PrimaryAlias = CHAT_COMMAND_ALIAS
+
+	chatCommand.Triggered:Connect(function(textSource: TextSource)
+		if textSource.UserId ~= LocalPlayer.UserId then
+			return
+		end
+
+		Pane:Toggle()
+	end)
+
+	chatCommand.Parent = TextChatService
+end
+
 function Branches:_setupIcon()
 	Icon.setDisplayOrder(1_001)
 	Icon.highlightKey = Enum.KeyCode.ButtonR3
 
-	local branchButton = Icon.new()
+	local branchButton = DeveloperTopbar:AddButton()
+	if not branchButton then
+		return
+	end
+
 	branchButton:setCaption("Teleport to a branch.")
 	branchButton:setImageScale(0.6)
 	branchButton:setImage("rbxassetid://75313622855437") -- Branch icon.
@@ -93,6 +117,10 @@ function Branches:Init()
 	self:_setupIcon()
 	self:_setupBranches()
 	self:_setupKeyCombo()
+
+	if DeveloperToolsConfig.ChatCommands then
+		self:_setupChatCommand()
+	end
 end
 
 return Branches

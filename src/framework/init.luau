@@ -534,6 +534,9 @@ end
 shared.Assets = ReplicatedStorage:WaitForChild("Assets", 999)
 shared.new = Order.New
 shared.PlaceType = Order.PlaceType
+-- The code groups loaded in this place, or nil when every group is loaded. Lets
+-- code check whether a system is present instead of checking place types.
+shared.CodeGroups = ActiveCodeGroups
 
 -- Enables shared keyword to act as require()
 setmetatable(shared, Order)
@@ -566,6 +569,14 @@ end
 IndexContext(LocalContext)
 IndexContext(SharedContext)
 Order.IndexModulesOf(PackageContext, true)
+-- Wally's server-only dependencies, when the project maps them into
+-- ServerScriptService.ServerPackages. That folder never replicates.
+if RunService:IsServer() then
+	local ServerPackageContext = game:GetService("ServerScriptService"):FindFirstChild("ServerPackages")
+	if ServerPackageContext then
+		Order.IndexModulesOf(ServerPackageContext, true)
+	end
+end
 
 local function IndexAssetModules(root: Instance)
 	for _, child: Instance in root:GetChildren() do
