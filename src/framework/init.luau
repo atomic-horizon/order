@@ -580,11 +580,10 @@ IndexContext(LocalContext)
 IndexContext(SharedContext)
 Order.IndexModulesOf(PackageContext, true)
 -- Server-only packages (Forest's ServerPackages mount or Wally's server
--- dependencies). Mapped into ServerStorage, which never replicates and does
--- not run Scripts that packages ship, such as test scripts.
--- ServerScriptService is still checked for projects that map them there.
+-- dependencies), mapped into ServerScriptService or ServerStorage. Neither
+-- replicates to clients.
 if RunService:IsServer() then
-	for _, serverPackageParent in { game:GetService("ServerStorage"), game:GetService("ServerScriptService") } do
+	for _, serverPackageParent in { game:GetService("ServerScriptService"), game:GetService("ServerStorage") } do
 		local serverPackageContext = serverPackageParent:FindFirstChild("ServerPackages")
 		if serverPackageContext then
 			Order.IndexModulesOf(serverPackageContext, true)
