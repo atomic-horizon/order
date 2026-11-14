@@ -6,7 +6,6 @@ realm = "shared"
 
 [dependencies]
 AnimNation = "michaeldougal/animnation@1.13.1"
-Cmdr = "evaera/cmdr@1.12.0"
 Component = "sleitnick/component@2.4.8"
 GamebeastSDK = "gamebeast-gg/gamebeast@0.9.0"
 Signal = "sleitnick/signal@2.0.3"
@@ -14,4 +13,5 @@ TopbarPlus = "1foreverhd/topbarplus@3.4.0"
 Trove = "sleitnick/trove@1.8.0"
 
 [server-dependencies]
+Cmdr = "evaera/cmdr@1.13.1"
 ProfileStore = "lm-loleris/profilestore@1.0.3"
