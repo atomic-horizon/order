@@ -1,0 +1,2 @@
+# Fixtures written with Luau export values, which StyLua cannot parse yet
+tests/cyclic-requires/CyclicRequireTests/Fixtures/

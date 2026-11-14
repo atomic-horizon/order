@@ -85,8 +85,11 @@ local CyclesFound: { string } = {}
 local LoadedModules: { [ModuleScript]: any } = {}
 -- A dictionary of known module aliases and the ModuleScripts they point to
 local Modules: { [string]: ModuleScript | { ModuleScript } } = {}
--- The set of all currently loading modules
-local ModulesLoading: { [ModuleScript]: boolean } = {}
+-- The currently loading modules and the threads loading them
+local ModulesLoading: { [ModuleScript]: thread } = {}
+-- The set of modules whose cached value is Luau's own export table, obtained
+-- through a native cyclic require
+local NativeCycleModules: { [ModuleScript]: true } = {}
 -- An array that contains the order in which modules are being loaded
 local ModuleLoadOrder: { ModuleScript } = {}
 -- A dictionary that relates module data tables to the modules' names
@@ -111,6 +114,10 @@ local function replaceTempModule(alias: string, data: any)
 				return data[requestedKey]
 			end,
 			__newindex = function(_, requestedKey, requestedValue)
+				if table.isfrozen(data) then
+					warn(`Cannot set key '{requestedKey}' on module {alias} - its exported values are read-only.`)
+					return
+				end
 				data[requestedKey] = requestedValue
 			end,
 			__tostring = function(_)
@@ -126,6 +133,46 @@ local function replaceTempModule(alias: string, data: any)
 	else
 		LoadedModules[module] = data
 	end
+end
+
+-- Records the chain of currently loading modules that leads back to the given
+-- module for the cyclic dependency analysis report
+local function recordCycle(module: ModuleScript, cycleKind: "native" | "placeholder")
+	if not Settings.Debug.CyclicAnalysis then
+		return
+	end
+
+	local cycle = ""
+	local foundStart = false
+	for _, loadingModule in ModuleLoadOrder do
+		if not foundStart and loadingModule.Name ~= module.Name then
+			continue
+		end
+
+		foundStart = true
+
+		cycle ..= loadingModule.Name .. " -> "
+	end
+	cycle ..= `{module.Name} ({cycleKind})`
+	table.insert(CyclesFound, cycle)
+end
+
+-- Attempts to resolve a cyclic require with Luau's native cyclic require
+-- support. Only used for cycles within a single thread, since Luau tracks
+-- cycles through the chain of requires. Returns Luau's export table for the
+-- module, or nil if Luau refused (e.g. a module in the cycle uses `return`).
+local function tryNativeCyclicRequire(target: string, module: ModuleScript): {}?
+	if not Settings.NativeCyclicRequires or ModulesLoading[module] ~= coroutine.running() then
+		return nil
+	end
+
+	local requireSuccess, nativeModule = pcall(require, module)
+	if not requireSuccess or typeof(nativeModule) ~= "table" then
+		dprint("\tNative cyclic require unavailable for", target, "-", nativeModule)
+		return nil
+	end
+
+	return nativeModule
 end
 
 -- Loads the given ModuleScript with error handling. Returns the loaded data.
@@ -285,11 +332,22 @@ function Order.__call(_: {}, target: string | ModuleScript, suppressWarnings: bo
 			return nil
 		end
 
-		ModulesLoading[module] = true
+		ModulesLoading[module] = coroutine.running()
 		table.insert(ModuleLoadOrder, module)
 		local moduleData = load(module)
 
-		if LoadedModules[module] then
+		if NativeCycleModules[module] then
+			-- Luau's export table was handed out during a cyclic require and
+			-- is now complete
+			if not rawequal(LoadedModules[module], moduleData) then
+				warn(
+					`Module {target} was required cyclically but did not finish as an export table.`,
+					"Modules in a native cycle must use `export` instead of `return`."
+				)
+				LoadedModules[module] = moduleData
+			end
+			dprint("\tLoaded", target, "(native cycle)")
+		elseif LoadedModules[module] then
 			-- Found temporary placeholder due to cyclic dependency
 			replaceTempModule(target, moduleData)
 		else
@@ -321,6 +379,15 @@ function Order.__call(_: {}, target: string | ModuleScript, suppressWarnings: bo
 			return nil
 		end
 
+		local nativeModule = tryNativeCyclicRequire(target, module)
+		if nativeModule then
+			LoadedModules[module] = nativeModule
+			NativeCycleModules[module] = true
+			recordCycle(module, "native")
+			dprint("\tSet", target, "to native export table")
+			return nativeModule
+		end
+
 		local fakeModule = {
 			IsFakeModule = true,
 			Name = module.Name,
@@ -328,21 +395,7 @@ function Order.__call(_: {}, target: string | ModuleScript, suppressWarnings: bo
 		setmetatable(fakeModule, CycleMetatable)
 		LoadedModules[module] = fakeModule
 
-		if Settings.Debug.CyclicAnalysis then
-			local cycle = ""
-			local foundStart = false
-			for _, loadingModule in ModuleLoadOrder do
-				if not foundStart and loadingModule.Name ~= module.Name then
-					continue
-				end
-
-				foundStart = true
-
-				cycle ..= loadingModule.Name .. " -> "
-			end
-			cycle ..= module.Name
-			table.insert(CyclesFound, cycle)
-		end
+		recordCycle(module, "placeholder")
 
 		dprint("\tSet", target, "to fake module")
 	end

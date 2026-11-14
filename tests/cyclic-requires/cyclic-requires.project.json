@@ -1,0 +1,43 @@
+{
+	"name": "Order Cyclic Require Tests",
+	"emitLegacyScripts": false,
+	"tree": {
+		"$className": "DataModel",
+		"ReplicatedStorage": {
+			"$className": "ReplicatedStorage",
+			"Order": {
+				"$path": "../../src/framework"
+			},
+			"Shared": {
+				"$className": "Folder",
+				"AssetModules": {
+					"$className": "Folder"
+				}
+			},
+			"Packages": {
+				"$className": "Folder"
+			},
+			"Assets": {
+				"$className": "Folder"
+			},
+			"CyclicRequireTests": {
+				"$path": "CyclicRequireTests"
+			}
+		},
+		"ServerScriptService": {
+			"$className": "ServerScriptService",
+			"Server": {
+				"$className": "Folder"
+			}
+		},
+		"StarterPlayer": {
+			"$className": "StarterPlayer",
+			"StarterPlayerScripts": {
+				"$className": "StarterPlayerScripts",
+				"Client": {
+					"$className": "Folder"
+				}
+			}
+		}
+	}
+}

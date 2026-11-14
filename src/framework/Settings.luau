@@ -21,6 +21,7 @@ export type OrderSettings = {
 	CodeGroups: { [string]: { [string]: true } },
 	InitOrder: "Individual" | "Project",
 	InitFunctionConfig: { Initializer },
+	NativeCyclicRequires: boolean,
 	SilentMode: boolean,
 }
 
@@ -86,6 +87,13 @@ return {
 			WarnDelay = 5,
 		},
 	},
+
+	-- When true, cyclic requires between modules that use Luau's `export`
+	-- syntax resolve to Luau's own export tables instead of Order's
+	-- placeholders. Requires the Luau Modularity feature (export values and
+	-- cyclic requires). Modules that `return` a value, and cycles between
+	-- tasks loading on different threads, always use Order's placeholders.
+	NativeCyclicRequires = false,
 
 	-- Disables regular output (does not disable warnings)
 	SilentMode = not game:GetService("RunService"):IsStudio(),
