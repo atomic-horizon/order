@@ -36,7 +36,11 @@
 			"$className": "ServerScriptService",
 			"Server": {
 				"$path": "src/server"
-			},
+			}
+		},
+		"ServerStorage": {
+			"$className": "ServerStorage",
+			"$ignoreUnknownInstances": true,
 			"ServerPackages": {
 				"$path": "ServerPackages"
 			}
