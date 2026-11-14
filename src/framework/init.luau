@@ -23,7 +23,7 @@ local Settings = require(script:WaitForChild("Settings")) ---@module Settings
 
 local Order = {
 	PlaceType = Settings.PlaceTypes[game.PlaceId] or "Generic",
-	Version = "3.0.1",
+	Version = "3.1.0",
 }
 
 type Initializer = Settings.Initializer

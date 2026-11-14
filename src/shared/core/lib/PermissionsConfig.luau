@@ -20,23 +20,33 @@
 	2. `UserDeniedPermissions`
 	3. `Admins`, then the test player and Studio settings
 	4. `UserPermissions`
-	5. `GroupPermissions`
+	5. `GroupPermissions`, checked with `GroupService:GetRolesInGroupAsync()`
 ]=]
 
 return {
-	-- The minimum rank in a group that grants a permission:
-	-- [label] = { [groupId] = minimumRank }
+	-- Group roles that grant a permission:
+	-- [label] = { [groupId] = { RoleIds = { roleId, ... } } }
+	--
+	-- Role IDs come from the "Copy Role ID" button at the bottom of a role's
+	-- settings page. Roblox recommends matching role IDs, since rank values no
+	-- longer decide a role's place in the hierarchy.
+	-- Only public roles can be checked; GroupService does not return private
+	-- roles.
+	--
+	-- `{ MinimumRank = number }`, or a bare number, matches any role at or above
+	-- that rank instead. Rank is kept for groups that still rely on it, but it
+	-- is deprecated by Roblox and should move to role IDs.
 	GroupPermissions = {
 		["cmdr"] = {
-			[13911975] = 253, -- Atomic Horizon / Developer
+			[13911975] = { MinimumRank = 253 }, -- Atomic Horizon / Developer
 		},
 		["mod"] = {
-			[13911975] = 250, -- Atomic Horizon / Moderator
+			[13911975] = { MinimumRank = 250 }, -- Atomic Horizon / Moderator
 		},
 		["branches"] = {
-			[13911975] = 253, -- Atomic Horizon / Developer
+			[13911975] = { MinimumRank = 253 }, -- Atomic Horizon / Developer
 		},
-	} :: { [string]: { [number]: number } },
+	} :: { [string]: { [number]: GroupRule } },
 
 	-- Users granted a permission regardless of their groups:
 	-- [label] = { [userId] = true }

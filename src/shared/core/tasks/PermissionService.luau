@@ -2,7 +2,7 @@
 
 	Author(s): ChiefWildin
 	Module: PermissionService.lua
-	Version: 1.1.0
+	Version: 1.2.0
 
 ]]
 
@@ -30,6 +30,14 @@ local GetRemote = shared("GetRemote")
 local PermissionsConfig = shared("PermissionsConfig")
 local rcall = shared("rcall")
 
+-- Types
+
+type GroupRule = PermissionsConfig.GroupRule
+type GroupRoles = {
+	IsMember: boolean,
+	Roles: { { Id: number, Name: string, Rank: number } },
+}
+
 -- Module Declaration
 
 local PermissionService = {}
@@ -47,7 +55,8 @@ local PermissionsRemote = GetRemote("Permissions")
 -- One entry per player per label. CacheService clears a cache outright once it
 -- passes its limit, so the limit must hold a full server checking every label.
 local PermissionsCache = CacheService:CreateCache("Permissions", 1024, 60)
-local UserGroupRanksCache = CacheService:CreateCache("Permissions.UserGroupRanks", 256, 60)
+local UserGroupRolesCache = CacheService:CreateCache("Permissions.UserGroupRoles", 1024, 60)
+local WarnedLegacyGroupRules: { [string]: boolean } = {}
 -- [label] = { [userId] = granted }, set by SetRuntimePermission on the server
 local RuntimePermissions: { [string]: { [number]: boolean } } = {}
 
@@ -57,7 +66,7 @@ local function getRuntimePermissionAttribute(label: string): string
 	return `{RUNTIME_PERMISSION_ATTRIBUTE_PREFIX}{label}`
 end
 
--- Answers every rule except group ranks, or nil when group ranks decide
+-- Answers every rule except group roles, or nil when group roles decide
 local function resolveWithoutGroups(userId: number, label: string): boolean?
 	local runtimeGrants = RuntimePermissions[label]
 	if runtimeGrants and runtimeGrants[userId] ~= nil then
@@ -93,31 +102,74 @@ local function resolveWithoutGroups(userId: number, label: string): boolean?
 	return nil
 end
 
--- Returns { [groupId] = rank } for any user, or nil if the lookup failed
-local function getUserGroupRanks(userId: number): { [number]: number }?
-	local cachedRanks = UserGroupRanksCache:Get(userId)
-	if cachedRanks ~= nil then
-		return cachedRanks
+-- Returns the user's public roles in a group, or nil if the lookup failed
+local function getUserGroupRoles(userId: number, groupId: number): GroupRoles?
+	local cacheKey = `{userId}.{groupId}`
+	local cachedRoles = UserGroupRolesCache:Get(cacheKey)
+	if cachedRoles ~= nil then
+		return cachedRoles
 	end
 
-	local userGroups = rcall({ retryLimit = 3, retryDelay = 2 }, GroupService.GetGroupsAsync, GroupService, userId)
-	if userGroups == nil then
+	local groupRoles = rcall(
+		{ retryLimit = 3, retryDelay = 2, jitter = true },
+		GroupService.GetRolesInGroupAsync,
+		GroupService,
+		userId,
+		groupId
+	)
+	if typeof(groupRoles) ~= "table" then
 		return nil
 	end
 
-	local ranksByGroupId = {}
-	for _, groupInfo in userGroups do
-		ranksByGroupId[groupInfo.Id] = groupInfo.Rank
-	end
-
-	UserGroupRanksCache:Set(userId, ranksByGroupId)
-	return ranksByGroupId
+	UserGroupRolesCache:Set(cacheKey, groupRoles)
+	return groupRoles
 end
 
--- Checks the group ranks a label requires. getRank answers nil when a lookup
--- failed, and a failed lookup denies without being cached, so a brief API
--- outage does not lock anyone out for the cache's lifetime.
-local function resolveGroups(userId: number, label: string, getRank: (groupId: number) -> number?): boolean
+local function warnLegacyGroupRule(label: string, groupId: number): ()
+	local warningKey = `{label}.{groupId}`
+	if WarnedLegacyGroupRules[warningKey] then
+		return
+	end
+
+	WarnedLegacyGroupRules[warningKey] = true
+	warn(
+		`[PermissionService] "{label}" uses a minimum rank for group {groupId}. Rank is deprecated by Roblox; use RoleIds in PermissionsConfig.`
+	)
+end
+
+local function rolesMatchRule(groupRoles: GroupRoles, groupRule: GroupRule, label: string, groupId: number): boolean
+	if not groupRoles.IsMember then
+		return false
+	end
+
+	local roleIds = if typeof(groupRule) == "table" then groupRule.RoleIds else nil
+	local minimumRank = if typeof(groupRule) == "number" then groupRule else groupRule.MinimumRank
+
+	if roleIds then
+		for _, role in groupRoles.Roles do
+			if table.find(roleIds, role.Id) then
+				return true
+			end
+		end
+	end
+
+	if minimumRank then
+		warnLegacyGroupRule(label, groupId)
+
+		for _, role in groupRoles.Roles do
+			if role.Rank >= minimumRank then
+				return true
+			end
+		end
+	end
+
+	return false
+end
+
+-- Checks the group roles a label requires. A failed lookup denies without
+-- being cached, so a brief API outage does not lock anyone out for the
+-- cache's lifetime.
+local function resolveGroups(userId: number, label: string): boolean
 	local cacheKey = `{userId}.{label}`
 	local cachedCheck = PermissionsCache:Get(cacheKey)
 	if cachedCheck ~= nil then
@@ -125,14 +177,14 @@ local function resolveGroups(userId: number, label: string, getRank: (groupId: n
 	end
 
 	local everyLookupAnswered = true
-	for groupId, minimumRank in PermissionsConfig.GroupPermissions[label] do
-		local rank = getRank(groupId)
-		if rank == nil then
+	for groupId, groupRule in PermissionsConfig.GroupPermissions[label] do
+		local groupRoles = getUserGroupRoles(userId, groupId)
+		if groupRoles == nil then
 			everyLookupAnswered = false
 			continue
 		end
 
-		if rank >= minimumRank then
+		if rolesMatchRule(groupRoles, groupRule, label, groupId) then
 			PermissionsCache:Set(cacheKey, true)
 			return true
 		end
@@ -155,7 +207,7 @@ end
 
 --[=[
 	Checks whether the player has the given permission. Returns `true` if they
-	do, or `false` if their rank is too low.
+	do, or `false` if no rule grants it.
 
 	On the client, runtime grants are seen through a replicated attribute, so
 	a check made before the attribute arrives can miss one.
@@ -176,19 +228,15 @@ function PermissionService:HasPermission(player: Player, permission: string): bo
 		return resolved
 	end
 
-	-- GetRankInGroup answers 0 for a group the player is not in, so a nil rank
-	-- means every retry failed
-	return resolveGroups(player.UserId, permission, function(groupId: number): number?
-		return rcall({ retryLimit = 3, retryDelay = 2 }, player.GetRankInGroup, player, groupId)
-	end)
+	return resolveGroups(player.UserId, permission)
 end
 
 --[=[
 	Checks whether any user has the given permission, including users who are
-	not in this server. Prefer `HasPermission` for players in the server.
+	not in this server.
 
 	Runtime grants are only known to the server, so on the client this
-	answers from `PermissionsConfig` and group ranks alone.
+	answers from `PermissionsConfig` and group roles alone.
 
 	@param userId number -- The UserId to check
 	@param permission string -- The permission label to check against
@@ -211,21 +259,14 @@ function PermissionService:UserHasPermission(userId: number, permission: string)
 		return resolved
 	end
 
-	local ranksByGroupId = getUserGroupRanks(userId)
-	return resolveGroups(userId, permission, function(groupId: number): number?
-		if ranksByGroupId == nil then
-			return nil
-		end
-
-		return ranksByGroupId[groupId] or 0
-	end)
+	return resolveGroups(userId, permission)
 end
 
 --[=[
 	@server
 
 	Grants or revokes a permission for a user until the server shuts down,
-	overriding `PermissionsConfig` and group ranks. Pass `nil` to remove the
+	overriding `PermissionsConfig` and group roles. Pass `nil` to remove the
 	override. Not saved, so a grant lasts only for this server.
 
 	@param permission string -- The permission label to override
