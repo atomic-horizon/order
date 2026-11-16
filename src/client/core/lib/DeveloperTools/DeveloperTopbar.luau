@@ -1,7 +1,7 @@
 --[[ File Info
 
 	Module: DeveloperTopbar.luau
-	Version: 1.0.0
+	Version: 1.0.1
 
 	Creates the top bar buttons for the developer tools. When a player can see
 	more than one, they are gathered into a single expandable group.
@@ -52,7 +52,7 @@ local function updateGroup(): ()
 		GroupIcon:setCaption(GROUP_CAPTION)
 	end
 
-	GroupIcon:setMenu(Buttons)
+	GroupIcon:setFixedMenu(Buttons)
 end
 
 -- Public Functions
