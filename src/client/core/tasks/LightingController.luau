@@ -2,7 +2,7 @@
 
     Author(s): TactBacon, ChiefWildin
     Module: LightingController.lua
-	Version: 2.2.0
+	Version: 2.2.1
 
 ]]
 
@@ -725,14 +725,15 @@ end
 
 function LightingController:Init()
 	ProfileFolder = shared.Assets:WaitForChild("LightingProfiles", 5)
-	FilterFolder = shared.Assets:WaitForChild("LightingFilters", 5)
-
 	if not ProfileFolder then
-		warn("No LightingProfiles folder found in Assets. Set one up before using LightingController.")
+		print("No LightingProfiles folder found in Assets. Set one up before using LightingController.")
 	end
 
+	FilterFolder = if not ProfileFolder
+		then shared.Assets:FindFirstChild("LightingFilters")
+		else shared.Assets:WaitForChild("LightingFilters", 5)
 	if not FilterFolder then
-		warn("No LightingFilters folder found in Assets. Set one up before using LightingController.")
+		print("No LightingFilters folder found in Assets. Set one up before using LightingController.")
 	end
 
 	if not ProfileFolder or not FilterFolder then
