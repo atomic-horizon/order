@@ -29,7 +29,7 @@ local PlaceTypeConfig: Settings.PlaceTypeEntry = if typeof(PlaceTypeEntry) == "t
 local Order = {
 	PlaceType = PlaceTypeConfig.Type,
 	Environment = PlaceTypeConfig.Environment or "Production",
-	Version = "3.1.0",
+	Version = "3.1.1",
 }
 
 type Initializer = Settings.Initializer
@@ -52,12 +52,6 @@ end
 local function dprint(...)
 	if Settings.Debug.VerboseLoading then
 		standardPrint("[Order] [Debug]:", ...)
-	end
-end
--- Verbose print (print if not on silent mode)
-local function vprint(...)
-	if not Settings.SilentMode then
-		print(...)
 	end
 end
 
